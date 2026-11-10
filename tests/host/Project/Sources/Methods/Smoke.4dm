@@ -3,7 +3,10 @@ var $ignored : Integer
 var $parameter; $name; $target : Text
 var $folderPath : Text
 var $request; $result; $report : Object
-var $tool : cs.ldap.LDAP
+var $tool; $secret : cs.ldap.LDAP
+var $ignoredObject : Object
+var HOST_Errors : Collection
+var HOST_ErrorScope : Text
 var $requestFile; $statusFile : 4D.File
 var $renamedExecutable : 4D.File
 var $cases : Collection
@@ -32,7 +35,8 @@ $target:="macOS-universal"
 If (Is Windows)
 	$target:="Windows-x64"
 End if
-$tool:=cs.ldap.LDAP.new($target)
+$tool:=cs.ldap.LDAP.new(New object("target"; $target))
+// Quoting round trips through the real CLI: RFC 4515 escaping changes only * ( ) \ NUL
 $cases:=New collection("world"; "path with spaces"; "quote \" and \\ slash"; "line\nbreak"; "日本語"; "$() ; & % !")
 $report:=New object("success"; True; "finished"; False; "cases"; New collection)
 $report.compiled:=$tool._cli.compiled
@@ -51,37 +55,56 @@ If ($request.expectCompiled#$report.compiled)
 	$report.success:=False
 End if
 For each ($name; $cases)
-	$result:=$tool.greet($name)
+	$result:=$tool._text($tool.execute(New collection("escape"; "filter"; $name); New object("connect"; False)))
 	$report.cases.push($result)
 	If (Not($result.ok))
 		$report.success:=False
-	Else
-		If ($result.value.message#("Hello, "+$name+"!"))
-			$report.success:=False
-		End if
 	End if
 End for each
-$result:=$tool.greet("")
-$report.invalid:=$result
-If ($result.ok | ($result.exitCode#2))
-	$report.success:=False
-End if
 $result:=$tool.version()
 $report.version:=$result
 If (Not($result.ok))
 	$report.success:=False
-Else
-	If ($result.value.version#"0.1.0")
-		$report.success:=False
-	End if
 End if
+HOST_Phase:="offline helpers"
+$report.escapedFilter:=$tool.escapeFilter("a*(b)")
+$report.escapedDN:=$tool.escapeDN("#Smith, John")
+$report.hyphenFilter:=$tool.escapeFilter("--version")
+$report.hyphenDN:=$tool.buildDN("-CN={cn}"; New object("cn"; "-x,y"))
+$report.builtDN:=$tool.buildDN("CN={cn},OU=Users,DC=corp"; New object("cn"; "Smith, John"))
+$report.missingArgDN:=$tool.buildDN("CN={cn},OU=Users"; New object)
+$report.parsedDN:=$tool.parseDN("CN=Smith\\, John,OU=Users,DC=corp")
+HOST_Phase:="error classification"
+$report.usage:=$tool.search(""; "")
+$report.connection:=cs.ldap.LDAP.new(New object("target"; $target; "uri"; "ldaps://127.0.0.1:1"; "connectTimeout"; 2)).whoami()
+$secret:=cs.ldap.LDAP.new(New object("target"; $target; "uri"; "ldaps://127.0.0.1:1"; "bindDN"; "cn=a"; "password"; "s3cret"))
+$report.passwordKept:=($secret.connection.password#Null)
+$report.stdinConflict:=$secret.execute(New collection("whoami"); New object("stdin"; "x"))
+$report.passwordBind:=$secret.whoami()
+HOST_Phase:="drop-in replacements"
+// Component errors reach the host handler installed with ek errors from components,
+// not the ek local one (with only a local handler the calling method is aborted).
+HOST_Errors:=Null
+HOST_ErrorScope:=""
+ON ERR CALL("Host_capture"; ek local)
+ON ERR CALL("Host_capture_component"; ek errors from components)
+$ignoredObject:=LDAP_Search("DC=corp"; "(cn=x)")
+$report.notLoggedIn:=New object("scope"; HOST_ErrorScope; "errors"; HOST_Errors)
+HOST_Errors:=Null
+HOST_ErrorScope:=""
+LDAP_LOGIN("ldaps://127.0.0.1:1"; "cn=a"; "s3cret")
+$report.loginFailed:=New object("scope"; HOST_ErrorScope; "errors"; HOST_Errors)
+$report.sessionAfterFailure:=(LDAP_Session()#Null)
+HOST_Errors:=Null
+ON ERR CALL(""; ek errors from components)
+ON ERR CALL("Host_error"; ek local)
 HOST_Phase:="missing executable"
 $result:=cs.ldap._CLI.new("missing-cli"; $target).execute(New collection("--version"))
 $report.missing:=$result
 If ($result.error.code#"missing_executable")
 	$report.success:=False
 End if
-$result:=cs.ldap.LDAP.new("unsupported-arm-target").version()
+$result:=cs.ldap.LDAP.new(New object("target"; "unsupported-arm-target")).version()
 $report.unsupported:=$result
 If ($result.error.code#"unsupported_architecture")
 	$report.success:=False
@@ -92,40 +115,13 @@ $report.launch:=$result
 If ($result.error.code#"launch_failed")
 	$report.success:=False
 End if
-HOST_Phase:="malformed protocol"
-$result:=$tool._decode(New object("ok"; True; "stdout"; "not json"; "stderr"; ""; "exitCode"; 0); "message")
-$report.protocol:=$result
-If ($result.error.code#"invalid_protocol")
-	$report.success:=False
-End if
-$report.protocolTypes:=New collection
-For each ($name; New collection("{\"protocol\":true,\"message\":\"invalid\"}"; "{\"protocol\":false,\"message\":\"invalid\"}"))
-	$result:=$tool._decode(New object("ok"; True; "stdout"; $name; "stderr"; ""; "exitCode"; 0); "message")
-	$report.protocolTypes.push($result)
-	If ($result.ok | ($result.error.code#"invalid_protocol"))
-		$report.success:=False
-	End if
-End for each
-$result:=$tool._decode(New object("ok"; True; "stdout"; "{\"protocol\":null,\"message\":\"invalid\"}"; "stderr"; ""; "exitCode"; 0); "message")
-$report.protocolNull:=$result
-If ($result.ok | ($result.error.code#"invalid_protocol"))
-	$report.success:=False
-End if
-$report.protocolScalars:=New collection
-For each ($name; New collection("true"; "false"; "null"; "1"; "[]"))
-	$result:=$tool._decode(New object("ok"; True; "stdout"; $name; "stderr"; ""; "exitCode"; 0); "message")
-	$report.protocolScalars.push($result)
-	If ($result.ok | ($result.error.code#"invalid_protocol"))
-		$report.success:=False
-	End if
-End for each
 HOST_Phase:="File argument"
-$result:=cs.ldap._CLI.new("ldap"; $target).execute(New collection("greet"; "--name"; $requestFile))
+$result:=cs.ldap._CLI.new("ldap"; $target).execute(New collection("escape"; "filter"; $requestFile))
 $report.fileArgument:=$result
 If (Not($result.ok))
 	$report.success:=False
 Else
-	If (JSON Parse($result.stdout).message#("Hello, "+$parameter+"!"))
+	If ($result.stdout#(Host_filter_escape($parameter)+"\n"))
 		$report.success:=False
 	End if
 End if
@@ -156,7 +152,7 @@ If ($report.missingArguments.ok | ($report.missingArguments.error.code#"invalid_
 	$report.success:=False
 End if
 HOST_Phase:="Folder argument"
-$result:=cs.ldap._CLI.new("ldap"; $target).execute(New collection("greet"; "--name"; $requestFile.parent))
+$result:=cs.ldap._CLI.new("ldap"; $target).execute(New collection("escape"; "filter"; $requestFile.parent))
 $report.folderArgument:=$result
 $folderPath:=$requestFile.parent.path
 If (Is Windows)
@@ -165,7 +161,7 @@ End if
 If (Not($result.ok))
 	$report.success:=False
 Else
-	If (JSON Parse($result.stdout).message#("Hello, "+$folderPath+"!"))
+	If ($result.stdout#(Host_filter_escape($folderPath)+"\n"))
 		$report.success:=False
 	End if
 End if

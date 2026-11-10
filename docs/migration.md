@@ -49,12 +49,23 @@ LDAP_LOGOUT
 | Binary attributes (`objectGUID`, `objectSid`, photos) | Raw text | `{base64: …}` objects, or readable SID/GUID with `LDAP_SET_OPTIONS({binary: "decode"})` | Read `.base64` or opt in to decoding |
 | Threads | Not thread safe | Preemptive capable | Can now run in workers and preemptive processes |
 | Login state | Per process | Per process | Nothing |
+| Error handler | `ON ERR CALL(…; ek local)` | `ON ERR CALL(…; ek errors from components)` | Add the component-scope handler ([Errors](#errors)) |
 
 ## Errors
 
-Failures raise 4D errors, as the built-in commands do, so existing
-`ON ERR CALL` handlers keep working. The errors carry
-`componentSignature: "ldap"` and these codes (from `Last errors`):
+Failures raise 4D errors, as the built-in commands do, but they are raised
+**inside a component**. 4D sends them to the host's handler for the
+`ek errors from components` scope, not to an `ek local` handler. With only a
+local handler, the error is not caught and the calling method stops (verified
+with tool4d 21 LTS in the host tests). Add one line wherever you install a
+handler around LDAP code:
+
+```4d
+ON ERR CALL("myErrorHandler"; ek local)                   // existing
+ON ERR CALL("myErrorHandler"; ek errors from components)  // add for the LDAP_* methods
+```
+
+The errors carry `componentSignature: "ldap"` and these codes (from `Last errors`):
 
 | errCode | Meaning |
 |---|---|

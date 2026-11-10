@@ -15,4 +15,6 @@ credentials raise an error here) and keeps the session for the current process.
 * With `LDAP_SET_OPTIONS({mech: "gssapi"; …})`, call `LDAP_LOGIN($url; ""; "")`
   for Kerberos single sign-on without any password.
 
-Errors are raised with `componentSignature` `"ldap"`; see [Migration](../../../../docs/migration.md#errors).
+Errors are raised with `componentSignature` `"ldap"`. Catch them with
+`ON ERR CALL(…; ek errors from components)`: a local handler does not see
+component errors. See [Migration](../../../../docs/migration.md#errors).

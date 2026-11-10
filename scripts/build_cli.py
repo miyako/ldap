@@ -53,7 +53,7 @@ def smoke_test(executable, version, contract, prefix=()):
                 return (json.dumps(value, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
             if not isinstance(value, str):
                 raise ValueError("CLI contract streams must be Text or JSON objects")
-            return value.encode("utf-8")
+            return value.replace("$VERSION", version).encode("utf-8")
         def stream_matches(field, actual):
             pattern_key = field + "Pattern"
             if pattern_key in case:
@@ -85,10 +85,12 @@ def build(root, target, language=None, cross=False):
     root = Path(root).resolve()
     config = load_config(root, initialized=True, repository=os.environ.get("GITHUB_REPOSITORY"))
     native = native_target()
-    if target not in TARGETS or (native != target and not cross):
+    # A pinned upstream release (cli/release.json) is fetched, not compiled.
+    fetched = (root / "cli" / "release.json").is_file()
+    if target not in TARGETS or (native != target and not cross and not fetched):
         raise ValueError("requested target does not match the native host architecture")
     selected = config["language"]
-    if cross and (selected != "go" or not native.startswith("macos-")):
+    if cross and not fetched and (selected != "go" or not native.startswith("macos-")):
         raise ValueError("--cross is supported only for Go on a native macOS host; use native CI for Rust/C++")
     if language is not None and language != selected:
         raise ValueError("requested language does not match template.json")
@@ -101,6 +103,8 @@ def build(root, target, language=None, cross=False):
     output.mkdir(parents=True, exist_ok=True)
     executable = output / (config["cli"] + (".exe" if target == "windows-x64" else ""))
     executable.unlink(missing_ok=True)
+    if fetched:
+        return prebuilt(root, target, native, executable)
     env = os.environ.copy()
     original_digest = source_digest(root)
     toolchain = selected
@@ -157,6 +161,28 @@ def build(root, target, language=None, cross=False):
         if not contract.is_file():
             raise ValueError("tests/cli-contract.json is required; define feature smoke vectors")
         smoke_test(executable, config["version"], contract)
+    record(root, target, executable, target == native, toolchain)
+    return executable
+
+
+def prebuilt(root, target, native, executable):
+    """Pinned upstream release instead of a source build (see scripts/prebuilt_cli.py).
+
+    Fetching needs no toolchain, so any target can be fetched on a macOS host;
+    only the native one is executed against the contract vectors.
+    """
+    from prebuilt_cli import fetch, load_pin
+    original_digest = source_digest(root)
+    if target.startswith("macos-") and not native.startswith("macos-"):
+        raise ValueError("macOS slices are extracted with lipo on a macOS host")
+    toolchain = fetch(root, target, executable)
+    if source_digest(root) != original_digest:
+        raise ValueError("CLI inputs changed during fetch")
+    if target == native:
+        contract = root / "tests/cli-contract.json"
+        if not contract.is_file():
+            raise ValueError("tests/cli-contract.json is required; define feature smoke vectors")
+        smoke_test(executable, load_pin(root)["version"], contract)
     record(root, target, executable, target == native, toolchain)
     return executable
 

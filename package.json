@@ -6,10 +6,10 @@
   "license": "MIT",
   "tool": {
     "platform": "macos",
-    "branch": "20.x",
-    "version": "20.7",
-    "build": "101905",
+    "branch": "21.x",
+    "version": "21.0",
+    "build": "100301",
     "arch": "arm",
-    "sha256": "40a5d177a4f73165f52abf6ec8000249d81411c41353ccf258cece8e74639261"
+    "sha256": "e15500e59ead66abab6f8c592643bd2e648429aaa0df5b700bd898e2f6043b8b"
   }
 }

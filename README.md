@@ -30,7 +30,7 @@ LDAP_LOGOUT
 | Large directories | Server size limit applies (AD: 1000 entries) | Automatic paging, server-side sort, AD range retrieval for large groups |
 | Isolation | Runs inside the 4D process | Separate process: a hang or crash in the network/TLS stack cannot take 4D down, and a hard timeout kills it |
 | Threads | Not thread safe | Preemptive capable; no shared connection state |
-| Errors | 4D error | Structured result (`ok`, `error.code`, LDAP `resultCode`, stderr), or 4D errors in the drop-ins |
+| Errors | 4D error | Structured result (`ok`, `error.code`, LDAP `resultCode`, stderr); the drop-ins raise 4D errors (caught with `ek errors from components`) |
 | Extending | Not possible | `execute()` reaches every CLI feature today; new functions are a few lines of 4D |
 
 Details: [cs.ldap.LDAP](component/ldap/Documentation/Classes/LDAP.md) ·
@@ -50,16 +50,39 @@ Details: [cs.ldap.LDAP](component/ldap/Documentation/Classes/LDAP.md) ·
 ## Requirements
 
 * 4D 21 LTS, or 4D 20 R2 or later (the drop-ins raise errors with `throw`).
+  The component is compiled with tool4d 21.0 (`package.json.tool`).
 * macOS 11 or later (universal), or Windows x64.
 
-## Status (sketch)
+## How the CLI gets here
 
-* The component compiles with tool4d 21 LTS (macOS arm64 and x86_64).
-* Not yet done: bundling the `ldap-cli` release binaries into `Resources/bin`
-  from pinned, checksummed release assets instead of building `cli/`;
-  replacing the template's CLI contract vectors and host smoke test with LDAP
-  cases (an OpenLDAP `slapd` fixture, as in ldap-cli's integration tests);
-  raising the CI compiler pin from 20.7 LTS; verification against Active Directory.
+The `ldap` executable is not built in this repository.
+[cli/release.json](cli/release.json) pins a release of
+[miyako/ldap-cli](https://github.com/miyako/ldap-cli) and the SHA-256 of each
+asset. `scripts/build_cli.py` (via [scripts/prebuilt_cli.py](scripts/prebuilt_cli.py))
+downloads the asset from github.com, checks the digest, and extracts the
+binary; on macOS it takes each slice out of the signed, notarized universal
+binary, and `ci_config.py assemble` puts the slices back together with their
+signatures intact. To move to a new CLI release, update `cli/release.json`
+(tag, version, digests from the release's `SHA256SUMS.txt`). The CLI keeps its
+own version; releasing the component changes only `template.json` and
+`package.json`.
+
+## Status
+
+Verified locally on macOS arm64 with tool4d 21.0:
+
+* CLI contract vectors (`tests/cli-contract.json`) and quoting round trips
+  against the pinned binary.
+* Real 4D host tests, from source and from the packed, compiled component:
+  offline helpers, error classification (`usage`, `connection`), password
+  handling, hyphen-leading values, and the drop-ins' errors (codes 1003 and 81,
+  delivered to the host's `ek errors from components` handler).
+* The bundled universal binary verifies as notarized Developer ID after
+  packaging.
+
+Not yet verified: macOS Intel and Windows at runtime; anything against a real
+directory server (search, writes, Kerberos, Active Directory). The host tests
+use only offline commands and an unreachable address.
 
 ---
 

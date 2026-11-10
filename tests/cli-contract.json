@@ -1,10 +1,73 @@
 {
-  "schema": 1,
-  "cases": [
-    {"args": ["--version"], "exitCode": 0, "stdout": {"protocol": 1, "version": "$VERSION"}, "stderr": ""},
-    {"args": ["greet", "--name", "世界 café"], "exitCode": 0, "stdout": {"protocol": 1, "message": "Hello, 世界 café!"}, "stderr": ""},
-    {"args": ["greet", "--name", "quote\" slash\\\n"], "exitCode": 0, "stdout": {"protocol": 1, "message": "Hello, quote\" slash\\\n!"}, "stderr": ""},
-    {"args": ["greet", "--name", ""], "exitCode": 2, "stdout": "", "stderr": {"protocol": 1, "error": {"code": "invalid_arguments", "message": "expected greet --name <non-empty UTF-8 name> or --version"}}},
-    {"args": ["unknown"], "exitCode": 2, "stdout": "", "stderr": {"protocol": 1, "error": {"code": "invalid_arguments", "message": "expected greet --name <non-empty UTF-8 name> or --version"}}}
-  ]
+ "schema": 1,
+ "cases": [
+  {
+   "args": [
+    "--version"
+   ],
+   "exitCode": 0,
+   "stdout": "ldap $VERSION\n",
+   "stderr": ""
+  },
+  {
+   "args": [
+    "escape",
+    "filter",
+    "a*(b)\\"
+   ],
+   "exitCode": 0,
+   "stdout": "a\\2a\\28b\\29\\5c\n",
+   "stderr": ""
+  },
+  {
+   "args": [
+    "escape",
+    "dn",
+    "#Smith, John"
+   ],
+   "exitCode": 0,
+   "stdout": "\\#Smith\\, John\n",
+   "stderr": ""
+  },
+  {
+   "args": [
+    "escape",
+    "unescape-dn",
+    "\\#Smith\\, John"
+   ],
+   "exitCode": 0,
+   "stdout": "#Smith, John\n",
+   "stderr": ""
+  },
+  {
+   "args": [
+    "dn",
+    "build",
+    "CN={cn},OU=Users",
+    "--arg",
+    "cn=Smith, John"
+   ],
+   "exitCode": 0,
+   "stdout": "CN=Smith\\, John,OU=Users\n",
+   "stderr": ""
+  },
+  {
+   "args": [
+    "dn",
+    "build",
+    "CN={cn},OU=Users"
+   ],
+   "exitCode": 2,
+   "stdout": "",
+   "stderr": "ldap: placeholder '{cn}' has no --arg cn=…\n"
+  },
+  {
+   "args": [
+    "search"
+   ],
+   "exitCode": 2,
+   "stdout": "",
+   "stderr": "ldap: no server given: use --uri, --domain or a profile\n"
+  }
+ ]
 }
