@@ -408,8 +408,13 @@ class PinnedCliBumpTests(unittest.TestCase):
         self.addCleanup(environment.stop)
 
     def test_component_version_moves_without_touching_the_pinned_cli(self):
-        _, updates = bump_release.plan(self.root, "0.1.1")
+        # Bump from whatever version is committed (Publish re-runs this after its own bump).
+        current = json.loads((self.root / "template.json").read_text())["version"]
+        major, minor, patch = map(int, current.split("."))
+        target = f"{major}.{minor}.{patch + 1}"
+        pin = (self.root / "cli/release.json").read_text()
+        _, updates = bump_release.plan(self.root, target)
         self.assertEqual(sorted(updates), ["package.json", "template.json"])
         for relative in updates:
-            self.assertEqual(json.loads(updates[relative])["version"], "0.1.1")
-        self.assertNotIn("0.1.1", (self.root / "cli/release.json").read_text())
+            self.assertEqual(json.loads(updates[relative])["version"], target)
+        self.assertEqual((self.root / "cli/release.json").read_text(), pin)
