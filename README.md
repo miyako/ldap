@@ -1,3 +1,68 @@
+# ldap
+
+A 4D component for LDAP and Active Directory: a full client class,
+`cs.ldap.LDAP`, and drop-in replacements for the built-in
+[LDAP commands](https://developer.4d.com/docs/commands/theme/LDAP).
+It runs [miyako/ldap-cli](https://github.com/miyako/ldap-cli), a signed native
+executable bundled in `Resources/bin`, as a separate process.
+
+```4d
+// Kerberos single sign-on: no password stored or typed
+$ldap:=cs.ldap.LDAP.new({domain: "corp.example"; mech: "gssapi"})
+$result:=$ldap.search(""; "(&(objectClass=user)(sAMAccountName={u}))"; {scope: "sub"; args: {u: $input}; attributes: ["mail"; "memberOf"]})
+
+// Existing code: rename LDAP LOGIN → LDAP_LOGIN, pass arrays as pointers
+LDAP_LOGIN("ldaps://dc1.corp.example"; "CORP\\jdoe"; $password)
+LDAP_SEARCH_ALL("DC=corp,DC=example"; ->$_entry; "(objectClass=user)"; LDAP all levels; ->$attrs)
+LDAP_LOGOUT
+```
+
+## Why use it instead of the built-in commands
+
+| | Built-in `LDAP` theme | `ldap` component |
+|---|---|---|
+| Operations | Bind and search, read-only | Search, add, modify, delete, rename, compare, password change and reset, Who am I?, any extended operation or control |
+| Encryption | Plaintext on `ldap://` unless you choose `ldaps://` | TLS always: `ldap://` is upgraded with StartTLS; plaintext binds are refused |
+| Authentication | Login and password (DIGEST-MD5 or plain) | Simple bind in TLS, Kerberos/SPNEGO single sign-on, client certificates (`EXTERNAL`), NTLM only on request; TLS channel binding for AD hardening |
+| Secrets | Passed to the server by the 4D process | Piped to the child process: never on a command line, in the environment, in a profile or on disk. Empty passwords (unauthenticated binds) are rejected |
+| Server identity | Platform library defaults | Verified against the OS trust store (Keychain, Windows store) with hostname verification, optional revocation checks and minimum TLS version; `probe()` shows the chain and fingerprints |
+| LDAP injection | You concatenate filters by hand | Templates escape every value for its context (RFC 4515 filters, RFC 4514 DNs); filters are syntax-checked before sending |
+| Large directories | Server size limit applies (AD: 1000 entries) | Automatic paging, server-side sort, AD range retrieval for large groups |
+| Isolation | Runs inside the 4D process | Separate process: a hang or crash in the network/TLS stack cannot take 4D down, and a hard timeout kills it |
+| Threads | Not thread safe | Preemptive capable; no shared connection state |
+| Errors | 4D error | Structured result (`ok`, `error.code`, LDAP `resultCode`, stderr), or 4D errors in the drop-ins |
+| Extending | Not possible | `execute()` reaches every CLI feature today; new functions are a few lines of 4D |
+
+Details: [cs.ldap.LDAP](component/ldap/Documentation/Classes/LDAP.md) ·
+[Migration from the built-in commands](docs/migration.md) ·
+[Extending](docs/extending.md) ·
+[ldap-cli security model](https://github.com/miyako/ldap-cli#security-model)
+
+## API at a glance
+
+| Layer | Use |
+|---|---|
+| `LDAP_LOGIN`, `LDAP_LOGOUT`, `LDAP_Search`, `LDAP_SEARCH_ALL` | Drop-in replacements for the built-in commands ([migration](docs/migration.md)) |
+| `LDAP_SET_OPTIONS`, `LDAP_Session` | Bridge: TLS/Kerberos options for the drop-ins, and the session as a `cs.ldap.LDAP` object |
+| `cs.ldap.LDAP` high-level functions | `search`, `findOne`, `add`, `modify`, `delete`, `rename`, `compare`, `whoami`, `changePassword`, `probe`, `escapeFilter`, `escapeDN`, `buildDN`, `parseDN`, `version` |
+| `cs.ldap.LDAP.execute()` | Any `ldap` command and option, with the instance's connection settings |
+
+## Requirements
+
+* 4D 21 LTS, or 4D 20 R2 or later (the drop-ins raise errors with `throw`).
+* macOS 11 or later (universal), or Windows x64.
+
+## Status (sketch)
+
+* The component compiles with tool4d 21 LTS (macOS arm64 and x86_64).
+* Not yet done: bundling the `ldap-cli` release binaries into `Resources/bin`
+  from pinned, checksummed release assets instead of building `cli/`;
+  replacing the template's CLI contract vectors and host smoke test with LDAP
+  cases (an OpenLDAP `slapd` fixture, as in ldap-cli's integration tests);
+  raising the CI compiler pin from 20.7 LTS; verification against Active Directory.
+
+---
+
 # 4D CLI component template
 
 An agent-ready **real 4D component project** wrapping a native CLI on macOS and
@@ -60,7 +125,7 @@ requires a fresh template. **The feature description is recorded, not automatica
 implemented.** Read [AGENTS.md](AGENTS.md) for the end-to-end agent workflow.
 
 After initialization, optional `scripts/rename_feature.py --root . --class NAME`
-rewrites only the known Greeting identity/configuration registry. It does **not**
+rewrites only the known LDAP identity/configuration registry. It does **not**
 implement the new API or protocol. Follow the playbook's full replacement
 inventory, including build smoke tests, host assertions and completion metadata.
 
@@ -124,7 +189,7 @@ component/<repository>/
   Project/Sources/Classes/
     _CLI.4dm                          generic resource resolver
     _Process.4dm                      generic quoting/execution/status adapter
-    Greeting.4dm                      replaceable feature API
+    LDAP.4dm                      replaceable feature API
   Project/Sources/Methods/_CaptureError.4dm
   Documentation/Classes/*.md           class contracts
   Resources/logo.png + logo.svg        original icon/reference wrapper
@@ -141,12 +206,12 @@ The **component/project/catalog/package/release ZIP name MUST equal the reposito
 basename** for dependency-manager releases. Namespace is independent:
 `settings.4DSettings` is XML with
 `<general component_classStore_name="ldap"/>`.
-Host code uses `cs.ldap.Greeting`; internal code uses `cs.Greeting`.
+Host code uses `cs.ldap.LDAP`; internal code uses `cs.LDAP`.
 4D shares classes through the namespace: underscores are internal **by
 convention**, not private access or an exported-class manifest.
 
 Class docs:
-[Greeting](component/ldap/Documentation/Classes/Greeting.md),
+[LDAP](component/ldap/Documentation/Classes/LDAP.md),
 [_CLI](component/ldap/Documentation/Classes/_CLI.md),
 [_Process](component/ldap/Documentation/Classes/_Process.md).
 The actual compiler generates `Resources/en.lproj/syntaxEN.json`, preventing
@@ -157,14 +222,14 @@ stale completion metadata.
 After installation, use your initialized namespace:
 
 ```4d
-var $tool : cs.ldap.Greeting
+var $tool : cs.ldap.LDAP
 var $result : Object
 var $target : Text
 $target:="macOS-universal"
 If (Is Windows)
   $target:="Windows-x64"
 End if
-$tool:=cs.ldap.Greeting.new($target)
+$tool:=cs.ldap.LDAP.new($target)
 $result:=$tool.greet("4D")
 If ($result.ok)
   ALERT($result.value.message)  // Hello, 4D!

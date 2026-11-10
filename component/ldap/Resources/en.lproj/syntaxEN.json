@@ -1,0 +1,701 @@
+{
+	"_method_": {
+		"LDAP_LOGOUT": {
+			"Syntax": "**LDAP_LOGOUT**() : Variant",
+			"Params": [
+				[
+					"",
+					"Variant",
+					"<-"
+				]
+			],
+			"Summary": ""
+		},
+		"LDAP_LOGIN": {
+			"Syntax": "**LDAP_LOGIN**( *url* : Text; *login* : Text; *password* : Text; *digest* : Integer )",
+			"Params": [
+				[
+					"url",
+					"Text",
+					"->"
+				],
+				[
+					"login",
+					"Text",
+					"->"
+				],
+				[
+					"password",
+					"Text",
+					"->"
+				],
+				[
+					"digest",
+					"Integer",
+					"->"
+				]
+			],
+			"Summary": ""
+		},
+		"LDAP_Search": {
+			"Syntax": "**LDAP_Search**( *dnRootEntry* : Text; *filter* : Text; *scope* : Text; *attributes* : Variant; *attributesAsArray* : Variant )->entry : Object",
+			"Params": [
+				[
+					"dnRootEntry",
+					"Text",
+					"->"
+				],
+				[
+					"filter",
+					"Text",
+					"->"
+				],
+				[
+					"scope",
+					"Text",
+					"->"
+				],
+				[
+					"attributes",
+					"Variant",
+					"->"
+				],
+				[
+					"attributesAsArray",
+					"Variant",
+					"->"
+				],
+				[
+					"entry",
+					"Object",
+					"<-"
+				]
+			],
+			"Summary": ""
+		},
+		"LDAP_SEARCH_ALL": {
+			"Syntax": "**LDAP_SEARCH_ALL**( *dnRootEntry* : Text; *result* : Variant; *filter* : Text; *scope* : Text; *attributes* : Variant; *attributesAsArray* : Variant )",
+			"Params": [
+				[
+					"dnRootEntry",
+					"Text",
+					"->"
+				],
+				[
+					"result",
+					"Variant",
+					"->"
+				],
+				[
+					"filter",
+					"Text",
+					"->"
+				],
+				[
+					"scope",
+					"Text",
+					"->"
+				],
+				[
+					"attributes",
+					"Variant",
+					"->"
+				],
+				[
+					"attributesAsArray",
+					"Variant",
+					"->"
+				]
+			],
+			"Summary": ""
+		},
+		"LDAP_Session": {
+			"Syntax": "**LDAP_Session**()->session : cs.ldap.LDAP",
+			"Params": [
+				[
+					"session",
+					"cs.ldap.LDAP",
+					"<-"
+				]
+			],
+			"Summary": ""
+		},
+		"LDAP_SET_OPTIONS": {
+			"Syntax": "**LDAP_SET_OPTIONS**( *options* : Object )",
+			"Params": [
+				[
+					"options",
+					"Object",
+					"->"
+				]
+			],
+			"Summary": ""
+		}
+	},
+	"cs.ldap": {
+		"_CLI": {
+			"new()": {
+				"Syntax": "**.new**( *executableName* : Text; *target* : Text )",
+				"Params": [
+					[
+						"executableName",
+						"Text",
+						"->"
+					],
+					[
+						"target",
+						"Text",
+						"->"
+					]
+				],
+				"Summary": ""
+			}
+		},
+		"LDAP": {
+			"new()": {
+				"Syntax": "**.new**( *connection* : Object )",
+				"Params": [
+					[
+						"connection",
+						"Object",
+						"->"
+					]
+				],
+				"Summary": ""
+			}
+		}
+	},
+	"_CLI": {
+		"execute()": {
+			"Syntax": "**.execute**( *arguments* : Collection; *settings* : Object )->result : Object",
+			"Params": [
+				[
+					"arguments",
+					"Collection",
+					"->"
+				],
+				[
+					"settings",
+					"Object",
+					"->"
+				],
+				[
+					"result",
+					"Object",
+					"<-"
+				]
+			],
+			"Summary": ""
+		},
+		"get compiled()": {
+			"Syntax": "**.get compiled**()->compiled : Boolean",
+			"Params": [
+				[
+					"compiled",
+					"Boolean",
+					"<-"
+				]
+			],
+			"Summary": ""
+		},
+		"target": {
+			"Syntax": "target : Text"
+		},
+		"executableName": {
+			"Syntax": "executableName : Text"
+		}
+	},
+	"LDAP": {
+		"escapeFilter()": {
+			"Syntax": "**.escapeFilter**( *value* : Text )->escaped : Text",
+			"Params": [
+				[
+					"value",
+					"Text",
+					"->"
+				],
+				[
+					"escaped",
+					"Text",
+					"<-"
+				]
+			],
+			"Summary": ""
+		},
+		"version()": {
+			"Syntax": "**.version**()->result : Object",
+			"Params": [
+				[
+					"result",
+					"Object",
+					"<-"
+				]
+			],
+			"Summary": ""
+		},
+		"add()": {
+			"Syntax": "**.add**( *dn* : Text; *attributes* : Object; *options* : Object )->result : Object",
+			"Params": [
+				[
+					"dn",
+					"Text",
+					"->"
+				],
+				[
+					"attributes",
+					"Object",
+					"->"
+				],
+				[
+					"options",
+					"Object",
+					"->"
+				],
+				[
+					"result",
+					"Object",
+					"<-"
+				]
+			],
+			"Summary": ""
+		},
+		"parseDN()": {
+			"Syntax": "**.parseDN**( *dn* : Text )->rdns : Collection",
+			"Params": [
+				[
+					"dn",
+					"Text",
+					"->"
+				],
+				[
+					"rdns",
+					"Collection",
+					"<-"
+				]
+			],
+			"Summary": ""
+		},
+		"changePassword()": {
+			"Syntax": "**.changePassword**( *newPassword* : Text; *options* : Object )->result : Object",
+			"Params": [
+				[
+					"newPassword",
+					"Text",
+					"->"
+				],
+				[
+					"options",
+					"Object",
+					"->"
+				],
+				[
+					"result",
+					"Object",
+					"<-"
+				]
+			],
+			"Summary": ""
+		},
+		"buildDN()": {
+			"Syntax": "**.buildDN**( *template* : Text; *args* : Object )->dn : Text",
+			"Params": [
+				[
+					"template",
+					"Text",
+					"->"
+				],
+				[
+					"args",
+					"Object",
+					"->"
+				],
+				[
+					"dn",
+					"Text",
+					"<-"
+				]
+			],
+			"Summary": ""
+		},
+		"search()": {
+			"Syntax": "**.search**( *base* : Text; *filter* : Text; *options* : Object )->result : Object",
+			"Params": [
+				[
+					"base",
+					"Text",
+					"->"
+				],
+				[
+					"filter",
+					"Text",
+					"->"
+				],
+				[
+					"options",
+					"Object",
+					"->"
+				],
+				[
+					"result",
+					"Object",
+					"<-"
+				]
+			],
+			"Summary": ""
+		},
+		"whoami()": {
+			"Syntax": "**.whoami**()->result : Object",
+			"Params": [
+				[
+					"result",
+					"Object",
+					"<-"
+				]
+			],
+			"Summary": ""
+		},
+		"rename()": {
+			"Syntax": "**.rename**( *dn* : Text; *newRDN* : Text; *options* : Object )->result : Object",
+			"Params": [
+				[
+					"dn",
+					"Text",
+					"->"
+				],
+				[
+					"newRDN",
+					"Text",
+					"->"
+				],
+				[
+					"options",
+					"Object",
+					"->"
+				],
+				[
+					"result",
+					"Object",
+					"<-"
+				]
+			],
+			"Summary": ""
+		},
+		"delete()": {
+			"Syntax": "**.delete**( *dn* : Text; *options* : Object )->result : Object",
+			"Params": [
+				[
+					"dn",
+					"Text",
+					"->"
+				],
+				[
+					"options",
+					"Object",
+					"->"
+				],
+				[
+					"result",
+					"Object",
+					"<-"
+				]
+			],
+			"Summary": ""
+		},
+		"escapeDN()": {
+			"Syntax": "**.escapeDN**( *value* : Text )->escaped : Text",
+			"Params": [
+				[
+					"value",
+					"Text",
+					"->"
+				],
+				[
+					"escaped",
+					"Text",
+					"<-"
+				]
+			],
+			"Summary": ""
+		},
+		"modify()": {
+			"Syntax": "**.modify**( *dn* : Text; *changes* : Object; *options* : Object )->result : Object",
+			"Params": [
+				[
+					"dn",
+					"Text",
+					"->"
+				],
+				[
+					"changes",
+					"Object",
+					"->"
+				],
+				[
+					"options",
+					"Object",
+					"->"
+				],
+				[
+					"result",
+					"Object",
+					"<-"
+				]
+			],
+			"Summary": ""
+		},
+		"findOne()": {
+			"Syntax": "**.findOne**( *base* : Text; *filter* : Text; *options* : Object )->result : Object",
+			"Params": [
+				[
+					"base",
+					"Text",
+					"->"
+				],
+				[
+					"filter",
+					"Text",
+					"->"
+				],
+				[
+					"options",
+					"Object",
+					"->"
+				],
+				[
+					"result",
+					"Object",
+					"<-"
+				]
+			],
+			"Summary": ""
+		},
+		"execute()": {
+			"Syntax": "**.execute**( *command* : Collection; *settings* : Object )->result : Object",
+			"Params": [
+				[
+					"command",
+					"Collection",
+					"->"
+				],
+				[
+					"settings",
+					"Object",
+					"->"
+				],
+				[
+					"result",
+					"Object",
+					"<-"
+				]
+			],
+			"Summary": ""
+		},
+		"probe()": {
+			"Syntax": "**.probe**()->result : Object",
+			"Params": [
+				[
+					"result",
+					"Object",
+					"<-"
+				]
+			],
+			"Summary": ""
+		},
+		"compare()": {
+			"Syntax": "**.compare**( *dn* : Text; *attribute* : Text; *value* : Text; *options* : Object )->result : Object",
+			"Params": [
+				[
+					"dn",
+					"Text",
+					"->"
+				],
+				[
+					"attribute",
+					"Text",
+					"->"
+				],
+				[
+					"value",
+					"Text",
+					"->"
+				],
+				[
+					"options",
+					"Object",
+					"->"
+				],
+				[
+					"result",
+					"Object",
+					"<-"
+				]
+			],
+			"Summary": ""
+		},
+		"connection": {
+			"Syntax": "connection : Object"
+		}
+	},
+	"_Process": {
+		"execute()": {
+			"Syntax": "**.execute**( *file* : 4D.File; *arguments* : Collection; *settings* : Object )->result : Object",
+			"Params": [
+				[
+					"file",
+					"4D.File",
+					"->"
+				],
+				[
+					"arguments",
+					"Collection",
+					"->"
+				],
+				[
+					"settings",
+					"Object",
+					"->"
+				],
+				[
+					"result",
+					"Object",
+					"<-"
+				]
+			],
+			"Summary": ""
+		},
+		"quote()": {
+			"Syntax": "**.quote**( *argument* : Text )->quoted : Text",
+			"Params": [
+				[
+					"argument",
+					"Text",
+					"->"
+				],
+				[
+					"quoted",
+					"Text",
+					"<-"
+				]
+			],
+			"Summary": ""
+		}
+	},
+	"_Compat": {
+		"session()": {
+			"Syntax": "**.session**()->session : cs.ldap.LDAP",
+			"Params": [
+				[
+					"session",
+					"cs.ldap.LDAP",
+					"<-"
+				]
+			],
+			"Summary": ""
+		},
+		"search()": {
+			"Syntax": "**.search**( *base* : Text; *filter* : Text; *scope* : Text; *attributes* : Variant; *asArray* : Variant )->entries : Collection",
+			"Params": [
+				[
+					"base",
+					"Text",
+					"->"
+				],
+				[
+					"filter",
+					"Text",
+					"->"
+				],
+				[
+					"scope",
+					"Text",
+					"->"
+				],
+				[
+					"attributes",
+					"Variant",
+					"->"
+				],
+				[
+					"asArray",
+					"Variant",
+					"->"
+				],
+				[
+					"entries",
+					"Collection",
+					"<-"
+				]
+			],
+			"Summary": ""
+		},
+		"list()": {
+			"Syntax": "**.list**( *value* : Variant )->list : Collection",
+			"Params": [
+				[
+					"value",
+					"Variant",
+					"->"
+				],
+				[
+					"list",
+					"Collection",
+					"<-"
+				]
+			],
+			"Summary": ""
+		},
+		"raise()": {
+			"Syntax": "**.raise**( *result* : Object )",
+			"Params": [
+				[
+					"result",
+					"Object",
+					"->"
+				]
+			],
+			"Summary": ""
+		},
+		"shape()": {
+			"Syntax": "**.shape**( *entry* : Object; *names* : Collection; *forced* : Collection )->shaped : Object",
+			"Params": [
+				[
+					"entry",
+					"Object",
+					"->"
+				],
+				[
+					"names",
+					"Collection",
+					"->"
+				],
+				[
+					"forced",
+					"Collection",
+					"->"
+				],
+				[
+					"shaped",
+					"Object",
+					"<-"
+				]
+			],
+			"Summary": ""
+		},
+		"literal()": {
+			"Syntax": "**.literal**( *text* : Text )->template : Text",
+			"Params": [
+				[
+					"text",
+					"Text",
+					"->"
+				],
+				[
+					"template",
+					"Text",
+					"<-"
+				]
+			],
+			"Summary": ""
+		}
+	}
+}

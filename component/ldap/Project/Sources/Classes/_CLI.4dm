@@ -8,7 +8,7 @@ Class constructor($executableName : Text; $target : Text)
 Function get compiled()->$compiled : Boolean
 	$compiled:=Is compiled mode
 
-Function execute($arguments : Collection)->$result : Object
+Function execute($arguments : Collection; $settings : Object)->$result : Object
 	var $platform; $name : Text
 	var $file : 4D.File
 	If (Not(Match regex("^[a-z][a-z0-9-]{0,62}$"; This.executableName)))
@@ -38,4 +38,4 @@ Function execute($arguments : Collection)->$result : Object
 		return New object("ok"; False; "error"; New object("code"; "missing_executable"; "message"; $file.path))
 	End if
 	$file:=File($file.platformPath; fk platform path)
-	$result:=cs._Process.new().execute($file; $arguments)
+	$result:=cs._Process.new().execute($file; $arguments; $settings)

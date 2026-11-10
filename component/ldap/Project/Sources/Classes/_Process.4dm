@@ -34,7 +34,7 @@ Function quote($argument : Text)->$quoted : Text
 	End for
 	$quoted+="\""
 
-Function execute($file : 4D.File; $arguments : Collection)->$result : Object
+Function execute($file : 4D.File; $arguments : Collection; $settings : Object)->$result : Object
 	var $command; $argument : Text
 	var $value : Variant
 	var $options : Object
@@ -72,6 +72,16 @@ Function execute($file : 4D.File; $arguments : Collection)->$result : Object
 		$command+=" "+This.quote($argument)
 	End for each
 	$options:=New object("dataType"; "text"; "encoding"; "UTF-8"; "hideWindow"; True; "timeout"; 30; "currentDirectory"; $file.parent)
+	If ($settings#Null)
+		If ((Value type($settings.timeout)=Is real) | (Value type($settings.timeout)=Is longint))
+			If ($settings.timeout>0)
+				$options.timeout:=$settings.timeout
+			End if
+		End if
+		If ((Value type($settings.stdin)#Is undefined) & (Value type($settings.stdin)#Is null) & (Value type($settings.stdin)#Is text))
+			return New object("ok"; False; "error"; New object("code"; "invalid_argument"; "message"; "stdin must be Text"))
+		End if
+	End if
 	$previous:=Method called on error(ek local)
 	CLI_LastErrors:=Null
 	ON ERR CALL("_CaptureError"; ek local)
@@ -81,6 +91,12 @@ Function execute($file : 4D.File; $arguments : Collection)->$result : Object
 	CLI_LastErrors:=Null
 	If ($worker=Null)
 		return New object("ok"; False; "error"; New object("code"; "launch_failed"; "message"; "4D could not create the system worker"; "details"; $launchErrors))
+	End if
+	If ($settings#Null)
+		If (Value type($settings.stdin)=Is text)
+			// Secrets travel through the pipe, never through argv or the environment
+			$worker.postMessage($settings.stdin)
+		End if
 	End if
 	$worker.closeInput()
 	$worker.wait()

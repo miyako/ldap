@@ -3,7 +3,7 @@ var $ignored : Integer
 var $parameter; $name; $target : Text
 var $folderPath : Text
 var $request; $result; $report : Object
-var $tool : cs.ldap.Greeting
+var $tool : cs.ldap.LDAP
 var $requestFile; $statusFile : 4D.File
 var $renamedExecutable : 4D.File
 var $cases : Collection
@@ -32,7 +32,7 @@ $target:="macOS-universal"
 If (Is Windows)
 	$target:="Windows-x64"
 End if
-$tool:=cs.ldap.Greeting.new($target)
+$tool:=cs.ldap.LDAP.new($target)
 $cases:=New collection("world"; "path with spaces"; "quote \" and \\ slash"; "line\nbreak"; "日本語"; "$() ; & % !")
 $report:=New object("success"; True; "finished"; False; "cases"; New collection)
 $report.compiled:=$tool._cli.compiled
@@ -81,7 +81,7 @@ $report.missing:=$result
 If ($result.error.code#"missing_executable")
 	$report.success:=False
 End if
-$result:=cs.ldap.Greeting.new("unsupported-arm-target").version()
+$result:=cs.ldap.LDAP.new("unsupported-arm-target").version()
 $report.unsupported:=$result
 If ($result.error.code#"unsupported_architecture")
 	$report.success:=False
