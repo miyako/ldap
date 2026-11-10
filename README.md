@@ -685,8 +685,9 @@ then publishes only the literal validated asset list.
 
 ## Icons
 
-Original `assets/icon-source.svg` is rendered to a **real 1024×1024 RGBA PNG**.
-Resources `logo.svg` is a reference-style **64×64 SVG embedding a PNG data URI**
+This component's artwork is supplied as `assets/icon-source.png` (a real
+1024×1024 RGBA PNG); without it, `assets/icon-source.svg` is rendered instead.
+Resources `logo.png` must equal that PNG, and `logo.svg` is a **64×64 SVG embedding a PNG data URI**
 whose decoded bytes equal `logo.png`. The convention is **PNG-in-SVG**, not the
 reverse (verified across all three inspirations).
 
