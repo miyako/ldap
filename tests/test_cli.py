@@ -1,207 +1,143 @@
+"""Tests for the pinned upstream CLI (cli/release.json, scripts/prebuilt_cli.py).
+
+The CLI is built, signed and released by miyako/ldap-cli. These tests check the
+pin and the fetch safeguards offline. When CI selects the CLI language
+(TEST_CLI_LANGUAGE), they also fetch the native binary and run quoting round
+trips through it, from a path that contains spaces.
+"""
+import hashlib
+import io
 import json
 import os
 from pathlib import Path
-import shutil
+import platform
 import subprocess
+import sys
 import tempfile
 import unittest
-
+import zipfile
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
-STARTERS = ROOT / "cli-starters"
-ERROR = (
-    b'{"protocol":1,"error":{"code":"invalid_arguments","message":'
-    b'"expected greet --name <non-empty UTF-8 name> or --version"}}\n'
-)
+sys.path.insert(0, str(ROOT / "scripts"))
+import prebuilt_cli  # noqa: E402
 
 
-def json_line(value):
-    return (json.dumps(value, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
+def zipped(entries):
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        for name, data in entries.items():
+            archive.writestr(name, data)
+    return buffer.getvalue()
 
 
-class ContractTests:
+class PinTests(unittest.TestCase):
+    def test_pin_is_complete(self):
+        pin = prebuilt_cli.load_pin(ROOT)
+        self.assertEqual(pin["repository"], "miyako/ldap-cli")
+        self.assertEqual(pin["assets"]["macos"]["member"], "ldap")
+        self.assertEqual(pin["assets"]["windows-x64"]["member"], "ldap.exe")
+
+    def test_malformed_pins_are_rejected(self):
+        good = json.loads((ROOT / "cli/release.json").read_text(encoding="utf-8"))
+        mutations = [
+            lambda p: p.update(schema=2),
+            lambda p: p.update(repository="../evil"),
+            lambda p: p.update(tag="latest"),
+            lambda p: p["assets"].pop("windows-x64"),
+            lambda p: p["assets"]["macos"].update(sha256="0" * 63),
+            lambda p: p["assets"]["macos"].update(member="../ldap"),
+            lambda p: p["assets"]["macos"].update(name="ldap.tar.gz"),
+        ]
+        for mutate in mutations:
+            pin = json.loads(json.dumps(good))
+            mutate(pin)
+            with tempfile.TemporaryDirectory() as scratch, self.subTest(pin=pin):
+                (Path(scratch) / "cli").mkdir()
+                (Path(scratch) / "cli/release.json").write_text(json.dumps(pin))
+                with self.assertRaises(ValueError):
+                    prebuilt_cli.load_pin(scratch)
+
+    def test_download_locations_are_restricted(self):
+        prebuilt_cli._check_url("https://github.com/miyako/ldap-cli/releases/download/v0.1.0/x.zip")
+        prebuilt_cli._check_url("https://release-assets.githubusercontent.com/github-production-release-asset/1")
+        for url in ("http://github.com/x", "https://example.com/x", "https://user:pw@github.com/x",
+                    "https://github.com:8443/x", "file:///etc/passwd"):
+            with self.subTest(url=url), self.assertRaises(ValueError):
+                prebuilt_cli._check_url(url)
+
+    def test_digest_is_checked_before_use(self):
+        pin = prebuilt_cli.load_pin(ROOT)
+        asset = dict(pin["assets"]["macos"])
+
+        class Response(io.BytesIO):
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                self.close()
+
+        data = zipped({"ldap": b"tampered"})
+        with patch("urllib.request.OpenerDirector.open", side_effect=lambda *a, **k: Response(data)):
+            with self.assertRaisesRegex(ValueError, "SHA-256 mismatch"):
+                prebuilt_cli.download(pin, asset)
+            asset["sha256"] = hashlib.sha256(data).hexdigest()
+            self.assertEqual(prebuilt_cli.download(pin, asset), data)
+
+    def test_archive_must_hold_exactly_one_executable(self):
+        self.assertEqual(prebuilt_cli.extract(zipped({"ldap": b"x", "README.md": b"r"}), "ldap"), b"x")
+        for entries in ({"README.md": b"r"}, {"bin/ldap": b"x"}, {"ldap/": b""}):
+            with self.subTest(entries=list(entries)), self.assertRaises(ValueError):
+                prebuilt_cli.extract(zipped(entries), "ldap")
+
+
+class NativeRoundTrips(unittest.TestCase):
+    """Fetch the real pinned binary and pass awkward arguments through it."""
+
     @classmethod
     def setUpClass(cls):
         selected = os.environ.get("TEST_CLI_LANGUAGE")
-        if selected not in (None, "none", "go", "rust", "cpp"):
-            raise RuntimeError("TEST_CLI_LANGUAGE must be none, go, rust, or cpp")
-        if selected == "none":
-            raise unittest.SkipTest("CLI toolchains disabled by TEST_CLI_LANGUAGE=none")
-        if selected is not None and selected != cls.language:
-            raise unittest.SkipTest("TEST_CLI_LANGUAGE selects " + selected)
-
-        config_path = ROOT / "template.json"
-        config = json.loads(config_path.read_text(encoding="utf-8")) if config_path.exists() else {}
-        initialized = config.get("initialized", False) or (ROOT / "cli").is_dir()
-        if initialized:
-            configured = config.get("language")
-            if configured not in ("go", "rust", "cpp"):
-                raise RuntimeError("initialized template.json must configure a CLI language")
-            if configured != cls.language:
-                if selected is not None:
-                    raise RuntimeError(
-                        "TEST_CLI_LANGUAGE selects " + selected
-                        + " but template.json configures " + configured
-                    )
-                raise unittest.SkipTest("initialized template selects " + configured)
-            original = ROOT / "cli"
-            executable_name = config["cli"]
+        if selected in (None, "none"):
+            raise unittest.SkipTest("network fetch runs only when CI selects the CLI language")
+        system, machine = platform.system(), platform.machine().lower()
+        if system == "Darwin":
+            target = "macos-arm64" if machine == "arm64" else "macos-x64"
+        elif system == "Windows" and machine in ("amd64", "x86_64"):
+            target = "windows-x64"
         else:
-            original = STARTERS / cls.language
-            executable_name = "component-cli"
-        if not original.is_dir():
-            raise RuntimeError("missing CLI source directory: " + str(original))
-
-        def unavailable(message):
-            if selected is not None:
-                raise RuntimeError("selected " + cls.language + " toolchain unavailable: " + message)
-            raise unittest.SkipTest("unavailable toolchain: " + message)
-
-        missing = [tool for tool in cls.tools if shutil.which(tool) is None]
-        if missing:
-            unavailable(", ".join(missing))
-        compiler = None
-        if cls.language == "cpp" and os.name != "nt":
-            compiler = next(
-                (shutil.which(tool) for tool in ("c++", "g++", "clang++") if shutil.which(tool)),
-                None,
-            )
-            if compiler is None:
-                unavailable("C++17 compiler")
+            raise unittest.SkipTest("no pinned binary for " + system + "/" + machine)
         scratch = tempfile.TemporaryDirectory(prefix=".cli-test path ", dir=Path(__file__).parent)
         cls.addClassCleanup(scratch.cleanup)
-        root = Path(scratch.name)
-        source = root / "source"
-        shutil.copytree(original, source)
-        environment = os.environ.copy()
-        executable_name += ".exe" if os.name == "nt" else ""
-        execution_directory = root / "executables with spaces"
-        execution_directory.mkdir()
-        cls.executable = execution_directory / executable_name
-        if cls.language == "go":
-            environment.pop("GOOS", None)
-            environment.pop("GOARCH", None)
-            environment["CGO_ENABLED"] = "0"
-            environment.update(
-                GOCACHE=str(root / "go-cache"),
-                GOPATH=str(root / "go-path"),
-                GOTOOLCHAIN="local",
-                GOPROXY="off",
-                GOSUMDB="off",
-            )
-            commands = [["go", "build", "-o", str(cls.executable), "."]]
-        elif cls.language == "rust":
-            environment.pop("CARGO_BUILD_TARGET", None)
-            environment["CARGO_TARGET_DIR"] = str(root / "target")
-            built_executable = root / "target" / "release" / executable_name
-            commands = [["cargo", "build", "--release", "--offline", "--locked"]]
-        else:
-            build = root / "build"
-            built_executable = build / executable_name
-            commands = [
-                ["cmake", "-S", str(source), "-B", str(build),
-                 "-DCMAKE_BUILD_TYPE=Release",
-                 *([] if os.name == "nt" else ["-DCMAKE_CXX_COMPILER=" + compiler]),
-                 *(["-A", "x64"] if os.name == "nt" else [])],
-                ["cmake", "--build", str(build), "--config", "Release"],
-            ]
-        for command in commands:
-            result = subprocess.run(
-                command, cwd=source, env=environment, capture_output=True, timeout=180
-            )
-            if result.returncode:
-                raise RuntimeError(
-                    "build failed: " + repr(command) + "\n"
-                    + result.stdout.decode("utf-8", errors="replace")
-                    + result.stderr.decode("utf-8", errors="replace")
-                )
-        if cls.language == "cpp" and not built_executable.exists():
-            built_executable = build / "Release" / executable_name
-        if cls.language != "go":
-            shutil.copy2(built_executable, cls.executable)
+        folder = Path(scratch.name) / "executables with spaces"
+        folder.mkdir()
+        cls.executable = folder / ("ldap.exe" if target == "windows-x64" else "ldap")
+        prebuilt_cli.fetch(ROOT, target, cls.executable)
 
-    def assert_result(self, arguments, status, stdout, stderr):
-        result = subprocess.run(
-            [os.fspath(self.executable), *arguments], capture_output=True, timeout=10
-        )
-        self.assertEqual(result.returncode, status)
-        self.assertEqual(result.stdout, stdout)
-        self.assertEqual(result.stderr, stderr)
+    def run_cli(self, *arguments):
+        return subprocess.run([os.fspath(self.executable), *arguments], capture_output=True, timeout=20)
 
-    def test_version(self):
-        self.assert_result(["--version"], 0, b'{"protocol":1,"version":"0.1.0"}\n', b"")
+    def test_version_matches_pin(self):
+        result = self.run_cli("--version")
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, ("ldap " + prebuilt_cli.load_pin(ROOT)["version"] + "\n").encode())
 
-    def test_name(self):
-        self.assertIn(" ", str(self.executable))
-        name = '😀 "quoted" \\backslash; \'$()\''
-        self.assert_result(
-            ["greet", "--name", name], 0,
-            json_line({"protocol": 1, "message": "Hello, " + name + "!"}), b"",
-        )
+    def test_filter_escaping_round_trips(self):
+        def reference(value):
+            return (value.replace("\\", "\\5c").replace("*", "\\2a")
+                    .replace("(", "\\28").replace(")", "\\29"))
+        values = ["World", "two words", " leading and trailing ", "世界 café 😀", 'a"b\\c',
+                  "line\nbreak", "<>&/ ", "--version", "$(echo no); `echo no`", "trailing\\"]
+        for value in values:
+            with self.subTest(value=value):
+                result = self.run_cli("escape", "filter", "--", value)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout.decode("utf-8"), reference(value) + "\n")
 
-    def test_names(self):
-        names = [
-            "World", "two words", " ", " leading and trailing ",
-            "世界 café 😀", 'a"b\\c', "line\nbreak", "\t\r\b\f",
-            "".join(chr(value) for value in range(1, 32)),
-            "<>&/\u2028\u2029", "\u007f\u0080\u07ff\u0800\uffff\U0010ffff",
-            "--version", "$(echo not-executed); `echo nope`",
-        ]
-        for name in names:
-            with self.subTest(name=name):
-                self.assert_result(
-                    ["greet", "--name", name], 0,
-                    json_line({"protocol": 1, "message": "Hello, " + name + "!"}), b"",
-                )
-
-    def test_invalid_arguments(self):
-        cases = [
-            [], [""], ["unknown"], ["greet"], ["greet", "--name"],
-            ["greet", "--name", ""], ["greet", "World"],
-            ["greet", "--name=World"], ["greet", "--unknown", "World"],
-            ["greet", "--name", "World", "--name", "Again"],
-            ["greet", "--name", "World", "extra"],
-            ["--name", "World", "greet"], ["greet", "--version"],
-            ["--version", "extra"], ["--version", "--version"],
-            ["greet", "--name", "World", "--version"],
-            ["GREET", "--name", "World"], ["greet", "--Name", "World"],
-        ]
-        for arguments in cases:
-            with self.subTest(arguments=arguments):
-                self.assert_result(arguments, 2, b"", ERROR)
-
-    @unittest.skipUnless(os.name == "posix", "raw byte arguments require POSIX")
-    def test_malformed_utf8(self):
-        malformed = [
-            b"\x80", b"\xff", b"\xc0\xaf", b"\xc1\xbf", b"\xc2",
-            b"\xe2\x82", b"\xe2(\xa1", b"\xe0\x80\x80", b"\xed\xa0\x80",
-            b"\xf0\x80\x80\x80", b"\xf4\x90\x80\x80", b"\xf5\x80\x80\x80",
-            b"\xf8\x88\x80\x80\x80", b"valid\xfe",
-        ]
-        for value in malformed:
-            for arguments in (
-                [b"greet", b"--name", value],
-                [value, b"--name", b"World"],
-                [b"greet", value, b"World"],
-                [b"--version", value],
-            ):
-                with self.subTest(arguments=arguments):
-                    self.assert_result(arguments, 2, b"", ERROR)
-
-
-class GoCLI(ContractTests, unittest.TestCase):
-    language = "go"
-    tools = ("go",)
-
-
-class RustCLI(ContractTests, unittest.TestCase):
-    language = "rust"
-    tools = ("cargo", "rustc")
-
-
-class CppCLI(ContractTests, unittest.TestCase):
-    language = "cpp"
-    tools = ("cmake",)
+    def test_usage_errors_exit_2_without_contacting_a_server(self):
+        result = self.run_cli("search")
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(result.stdout, b"")
+        self.assertIn(b"no server given", result.stderr)
 
 
 if __name__ == "__main__":

@@ -37,7 +37,8 @@ class PlaybookTests(unittest.TestCase):
 
     def test_versioned_public_pin_and_cross_platform_checkout_policy(self):
         tool = json.loads((ROOT / "package.json").read_text())["tool"]
-        self.assertEqual(tool["build"], "101905")
+        # The drop-ins use throw (4D 20 R2+): the compiler pin is 21.0 LTS, not the template's 20.7.
+        self.assertEqual((tool["branch"], tool["version"], tool["build"]), ("21.x", "21.0", "100301"))
         self.assertEqual(len(tool["sha256"]), 64)
         attributes = (ROOT / ".gitattributes").read_text()
         self.assertIn("* text=auto eol=lf", attributes)

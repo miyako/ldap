@@ -29,7 +29,7 @@ $result:=$ldap.search("CN=Deleted Objects,DC=corp,DC=example"; "(isDeleted=TRUE)
 $result:=$ldap.execute(["exop"; "1.3.6.1.4.1.4203.1.11.3"])
 
 // LDIF import: a 4D.File argument is expanded to the native path for you
-$result:=$ldap.execute(["add"; "--file"; $ldifFile; "--continue-on-error"])
+$result:=$ldap.execute(["add"; "--file"; $ldifFile; "--continue-on-error"])  // 4D.File: expanded by _Process
 ```
 
 ## 2. Wrap a recurring task in your own class
@@ -55,11 +55,12 @@ Function isMemberOf($user : Text; $groupDN : Text)->$member : Boolean
 
 A new high-level function builds an argument Collection and calls `execute()`.
 Arguments are passed to the process one by one, quoted by `_Process`; nothing
-goes through a shell, so no escaping is needed in 4D:
+goes through a shell, so no escaping is needed in 4D. Pass option values as
+`"--flag="+$value` so a value starting with `-` is not read as an option:
 
 ```4d
 Function refresh($dn : Text; $ttl : Integer)->$result : Object
-	$result:=This.execute(["exop"; "refresh"; "--value"; $dn; "--ttl"; String($ttl)])
+	$result:=This.execute(["exop"; "refresh"; "--value="+$dn; "--ttl="+String($ttl)])
 ```
 
 ## 4. Add a feature to the CLI

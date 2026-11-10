@@ -17,6 +17,8 @@ import initialize
 import rename_feature
 
 
+@unittest.skipUnless((ROOT / "cli-starters").is_dir(),
+                     "template self-test: needs the uninitialized template's cli-starters/")
 class BumpReleaseTests(unittest.TestCase):
     def setUp(self):
         self.root = ROOT / (".bump-release-test-" + uuid.uuid4().hex)
@@ -384,3 +386,30 @@ class BumpReleaseTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PinnedCliBumpTests(unittest.TestCase):
+    """This repository: the CLI is a pinned upstream release (cli/release.json)."""
+
+    def setUp(self):
+        self.root = ROOT / (".bump-pinned-test-" + uuid.uuid4().hex)
+        self.root.mkdir()
+        self.addCleanup(shutil.rmtree, self.root)
+        for name in ("component", "cli", "tests/host", ".github/workflows", "scripts", "tooling"):
+            shutil.copytree(ROOT / name, self.root / name,
+                            ignore=shutil.ignore_patterns("DerivedData", "bin", "__pycache__"))
+        for name in ("template.json", "package.json", "README.md", "release-policy.json", "workflow-contract.json",
+                     "tests/test_cli.py", "tests/cli-contract.json"):
+            shutil.copy2(ROOT / name, self.root / name)
+        for args in (("init", "-q"), ("remote", "add", "origin", "https://github.com/owner/ldap.git")):
+            subprocess.run(["git", *args], cwd=self.root, check=True)
+        environment = patch.dict(os.environ, {"GITHUB_REPOSITORY": "owner/ldap"})
+        environment.start()
+        self.addCleanup(environment.stop)
+
+    def test_component_version_moves_without_touching_the_pinned_cli(self):
+        _, updates = bump_release.plan(self.root, "0.1.1")
+        self.assertEqual(sorted(updates), ["package.json", "template.json"])
+        for relative in updates:
+            self.assertEqual(json.loads(updates[relative])["version"], "0.1.1")
+        self.assertNotIn("0.1.1", (self.root / "cli/release.json").read_text())

@@ -126,123 +126,126 @@ def plan(root, version, repository=None):
         r'(?:\s*:\s*[^=\r\n]+|\s+string)?\s*=\s*")(?P<version>[^"\r\n]*)"')
     component = Path("component") / config["repository"]
     feature = config.get("feature_class", "Greeting")
-    source = {"go": "cli/main.go", "rust": "cli/src/main.rs", "cpp": "cli/main.cpp"}[config["language"]]
-    source_text = read(source)
-    placeholders = {"go": ("%s",), "rust": ("{}",), "cpp": (")",)}[config["language"]]
-    count = literal(source, protocol, placeholders=placeholders)
-    # Combine edits against the original text, rather than losing a protocol edit.
-    if re.search(assignment, source_text):
-        for match in re.finditer(assignment, source_text):
-            if match["version"] != old:
-                raise ValueError(f"inconsistent component version in {source}")
-        updates[source] = re.sub(assignment, lambda m: m[0].replace('"' + old + '"', '"' + version + '"'),
-                                 updates.get(source, source_text))
-        if updates[source] == source_text:
-            updates.pop(source)
-        count += 1
-    if not count and not (config["language"] == "rust" and 'env!("CARGO_PKG_VERSION")' in source_text):
-        raise ValueError(f"missing supported CLI version surface: {source}")
+    # A pinned upstream CLI (cli/release.json) keeps its own version: the component
+    # version lives only in metadata, and the CLI contracts assert the pinned version.
+    if not (root / "cli" / "release.json").is_file():
+        source = {"go": "cli/main.go", "rust": "cli/src/main.rs", "cpp": "cli/main.cpp"}[config["language"]]
+        source_text = read(source)
+        placeholders = {"go": ("%s",), "rust": ("{}",), "cpp": (")",)}[config["language"]]
+        count = literal(source, protocol, placeholders=placeholders)
+        # Combine edits against the original text, rather than losing a protocol edit.
+        if re.search(assignment, source_text):
+            for match in re.finditer(assignment, source_text):
+                if match["version"] != old:
+                    raise ValueError(f"inconsistent component version in {source}")
+            updates[source] = re.sub(assignment, lambda m: m[0].replace('"' + old + '"', '"' + version + '"'),
+                                     updates.get(source, source_text))
+            if updates[source] == source_text:
+                updates.pop(source)
+            count += 1
+        if not count and not (config["language"] == "rust" and 'env!("CARGO_PKG_VERSION")' in source_text):
+            raise ValueError(f"missing supported CLI version surface: {source}")
 
-    if config["language"] == "rust":
-        for relative, header in (("cli/Cargo.toml", r"\[package\]"),
-                                 ("cli/Cargo.lock", r"\[\[package\]\]")):
+        if config["language"] == "rust":
+            for relative, header in (("cli/Cargo.toml", r"\[package\]"),
+                                     ("cli/Cargo.lock", r"\[\[package\]\]")):
+                before = read(relative)
+                blocks = list(re.finditer(
+                    r"(?ms)^" + header + r"[ \t]*\r?\n.*?(?=^\[|\Z)", before))
+                own = [block for block in blocks if re.search(
+                    r'^name\s*=\s*"' + re.escape(config["cli"]) + r'"\s*$', block[0], re.MULTILINE)]
+                if len(own) != 1:
+                    raise ValueError(f"expected exactly one CLI package in {relative}")
+                block = own[0]
+                pattern = r'(?m)^version\s*=\s*"([^"]+)"[ \t]*$'
+                values = list(re.finditer(pattern, block[0]))
+                if len(values) != 1 or values[0][1] != old:
+                    raise ValueError(f"inconsistent CLI package version in {relative}")
+                changed = re.sub(pattern, lambda m: m[0].replace('"' + old + '"', '"' + version + '"'), block[0])
+                save(relative, before, before[:block.start()] + changed + before[block.end():])
+        elif config["language"] == "cpp":
+            cmake = "cli/CMakeLists.txt"
+            literal(cmake, r'(?i:\bproject\(\s*' + re.escape(config["cli"])
+                    + r'\s+VERSION\s+)(?P<version>[^\s)]+)')
+            # Combine independent CMake surfaces in memory if both are present.
+            before = read(cmake)
+            pattern = (r'(?i:\bset\(\s*(?:COMPONENT_VERSION|CLI_VERSION)\s+")'
+                       r'(?P<version>[^"\r\n]*)"')
+            for match in re.finditer(pattern, before):
+                if match["version"] != old:
+                    raise ValueError(f"inconsistent component version in {cmake}")
+            after = re.sub(pattern, lambda m: m[0].replace('"' + old + '"', '"' + version + '"'),
+                           updates.get(cmake, before))
+            save(cmake, before, after)
+
+        feature_path = component / "Project/Sources/Classes" / (feature + ".4dm")
+        # Adopted features sometimes expose a component version on the constructor.
+        literal(feature_path, r'(?i:\bThis\.(?:componentVersion|cliVersion|version)\s*:=\s*")(?P<version>[^"\r\n]*)"')
+        literal("tests/host/Project/Sources/Methods/Smoke.4dm",
+                r'\.value\.version\s*[#=]\s*"(?P<version>[^"\r\n]+)"', required=True)
+        literal("README.md", r"^\|[^\n]*`" + re.escape(config["cli"])
+                + r" --version`[^\n]*" + protocol, required=True)
+        literal(component / "Documentation/Classes" / (feature + ".md"), protocol, required=True)
+        # The independent Python CLI test also contains a literal --version response.
+        literal("tests/test_cli.py", protocol, required=True)
+
+        def payload(value, *, placeholder=False):
+            if isinstance(value, dict) and "version" in value and type(value.get("protocol")) is int and value["protocol"] == 1:
+                if value["version"] == "$VERSION":
+                    if placeholder:
+                        return value
+                    raise ValueError("host version assertions must contain the concrete version")
+                if value["version"] != old:
+                    raise ValueError("inconsistent protocol version response in contract")
+                return dict(value, version=version)
+            if isinstance(value, str):
+                try:
+                    decoded = parse_json(value)
+                except json.JSONDecodeError as error:
+                    raise ValueError("malformed version protocol response in contract") from error
+                if not isinstance(decoded, dict):
+                    raise ValueError("version protocol response must be an object")
+                changed = payload(decoded, placeholder=placeholder)
+                if changed != decoded:
+                    return json.dumps(changed, separators=(",", ":"), ensure_ascii=False) + (
+                        "\n" if value.endswith("\n") else "")
+                return value
+            raise ValueError("missing protocol/version fields in version contract")
+
+        for relative in ("tests/host/contract.json", "tests/cli-contract.json"):
             before = read(relative)
-            blocks = list(re.finditer(
-                r"(?ms)^" + header + r"[ \t]*\r?\n.*?(?=^\[|\Z)", before))
-            own = [block for block in blocks if re.search(
-                r'^name\s*=\s*"' + re.escape(config["cli"]) + r'"\s*$', block[0], re.MULTILINE)]
-            if len(own) != 1:
-                raise ValueError(f"expected exactly one CLI package in {relative}")
-            block = own[0]
-            pattern = r'(?m)^version\s*=\s*"([^"]+)"[ \t]*$'
-            values = list(re.finditer(pattern, block[0]))
-            if len(values) != 1 or values[0][1] != old:
-                raise ValueError(f"inconsistent CLI package version in {relative}")
-            changed = re.sub(pattern, lambda m: m[0].replace('"' + old + '"', '"' + version + '"'), block[0])
-            save(relative, before, before[:block.start()] + changed + before[block.end():])
-    elif config["language"] == "cpp":
-        cmake = "cli/CMakeLists.txt"
-        literal(cmake, r'(?i:\bproject\(\s*' + re.escape(config["cli"])
-                + r'\s+VERSION\s+)(?P<version>[^\s)]+)')
-        # Combine independent CMake surfaces in memory if both are present.
-        before = read(cmake)
-        pattern = (r'(?i:\bset\(\s*(?:COMPONENT_VERSION|CLI_VERSION)\s+")'
-                   r'(?P<version>[^"\r\n]*)"')
-        for match in re.finditer(pattern, before):
-            if match["version"] != old:
-                raise ValueError(f"inconsistent component version in {cmake}")
-        after = re.sub(pattern, lambda m: m[0].replace('"' + old + '"', '"' + version + '"'),
-                       updates.get(cmake, before))
-        save(cmake, before, after)
-
-    feature_path = component / "Project/Sources/Classes" / (feature + ".4dm")
-    # Adopted features sometimes expose a component version on the constructor.
-    literal(feature_path, r'(?i:\bThis\.(?:componentVersion|cliVersion|version)\s*:=\s*")(?P<version>[^"\r\n]*)"')
-    literal("tests/host/Project/Sources/Methods/Smoke.4dm",
-            r'\.value\.version\s*[#=]\s*"(?P<version>[^"\r\n]+)"', required=True)
-    literal("README.md", r"^\|[^\n]*`" + re.escape(config["cli"])
-            + r" --version`[^\n]*" + protocol, required=True)
-    literal(component / "Documentation/Classes" / (feature + ".md"), protocol, required=True)
-    # The independent Python CLI test also contains a literal --version response.
-    literal("tests/test_cli.py", protocol, required=True)
-
-    def payload(value, *, placeholder=False):
-        if isinstance(value, dict) and "version" in value and type(value.get("protocol")) is int and value["protocol"] == 1:
-            if value["version"] == "$VERSION":
-                if placeholder:
-                    return value
-                raise ValueError("host version assertions must contain the concrete version")
-            if value["version"] != old:
-                raise ValueError("inconsistent protocol version response in contract")
-            return dict(value, version=version)
-        if isinstance(value, str):
-            try:
-                decoded = parse_json(value)
-            except json.JSONDecodeError as error:
-                raise ValueError("malformed version protocol response in contract") from error
-            if not isinstance(decoded, dict):
-                raise ValueError("version protocol response must be an object")
-            changed = payload(decoded, placeholder=placeholder)
-            if changed != decoded:
-                return json.dumps(changed, separators=(",", ":"), ensure_ascii=False) + (
-                    "\n" if value.endswith("\n") else "")
-            return value
-        raise ValueError("missing protocol/version fields in version contract")
-
-    for relative in ("tests/host/contract.json", "tests/cli-contract.json"):
-        before = read(relative)
-        contract = parse_json(before)
-        if not isinstance(contract, dict) or contract.get("schema") != 1:
-            raise ValueError(f"unsupported contract: {relative}")
-        seen = 0
-        if relative == "tests/host/contract.json":
-            for section in ("feature", "execution"):
-                assertions = contract[section]["assertions"]
-                for assertion in assertions:
-                    path = assertion.get("path", "")
-                    if path in ("/version/stdout", "/version/value", "/version/value/version",
-                                "/renamedExecutable", "/renamedExecutable/stdout"):
-                        if "equals" not in assertion:
-                            raise ValueError("version host assertions must use exact equals")
-                        value = assertion["equals"]
-                        if path.endswith("/value/version"):
-                            if value != old:
-                                raise ValueError("inconsistent host version assertion")
-                            assertion["equals"] = version
-                        elif path == "/renamedExecutable":
-                            assertion["equals"] = dict(value, stdout=payload(value["stdout"]))
-                        else:
-                            assertion["equals"] = payload(value)
+            contract = parse_json(before)
+            if not isinstance(contract, dict) or contract.get("schema") != 1:
+                raise ValueError(f"unsupported contract: {relative}")
+            seen = 0
+            if relative == "tests/host/contract.json":
+                for section in ("feature", "execution"):
+                    assertions = contract[section]["assertions"]
+                    for assertion in assertions:
+                        path = assertion.get("path", "")
+                        if path in ("/version/stdout", "/version/value", "/version/value/version",
+                                    "/renamedExecutable", "/renamedExecutable/stdout"):
+                            if "equals" not in assertion:
+                                raise ValueError("version host assertions must use exact equals")
+                            value = assertion["equals"]
+                            if path.endswith("/value/version"):
+                                if value != old:
+                                    raise ValueError("inconsistent host version assertion")
+                                assertion["equals"] = version
+                            elif path == "/renamedExecutable":
+                                assertion["equals"] = dict(value, stdout=payload(value["stdout"]))
+                            else:
+                                assertion["equals"] = payload(value)
+                            seen += 1
+            else:
+                for case in contract["cases"]:
+                    if case.get("args") == ["--version"]:
+                        case["stdout"] = payload(case["stdout"], placeholder=True)
                         seen += 1
-        else:
-            for case in contract["cases"]:
-                if case.get("args") == ["--version"]:
-                    case["stdout"] = payload(case["stdout"], placeholder=True)
-                    seen += 1
-        if not seen:
-            raise ValueError(f"missing exact version contract assertions: {relative}")
-        if contract != parse_json(before):
-            save(relative, before, json.dumps(contract, indent=2, ensure_ascii=False) + "\n")
+            if not seen:
+                raise ValueError(f"missing exact version contract assertions: {relative}")
+            if contract != parse_json(before):
+                save(relative, before, json.dumps(contract, indent=2, ensure_ascii=False) + "\n")
     for surface in workflow_configuration(root)["version_surfaces"]:
         relative = surface["path"]
         before = updates.get(relative, read(relative))

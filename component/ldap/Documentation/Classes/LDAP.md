@@ -92,13 +92,17 @@ Runs **any** `ldap` command with this instance's connection options. `command`
 is the argument list after the global options, so every CLI option is
 available, including ones that have no dedicated function yet.
 
+Write option values as one `--flag=value` element and put positional values
+after `"--"`: then a value that starts with `-` cannot be read as an option.
+The class's own functions do this.
+
 `settings`: `{stdin: Text; timeout: Integer; connect: Boolean}`. `connect: False`
 omits the connection options (offline commands such as `escape` and `dn`).
 `stdin` is refused when the bind password already uses it.
 
 ```4d
 // Dynamic entry refresh (RFC 2589): no dedicated function needed
-$result:=$ldap.execute(["exop"; "refresh"; "--value"; $dn; "--ttl"; "300"])
+$result:=$ldap.execute(["exop"; "refresh"; "--value="+$dn; "--ttl=300"])
 ```
 
 ### search()

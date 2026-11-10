@@ -1,5 +1,8 @@
 // cs.ldap.LDAP — LDAP client backed by the bundled `ldap` CLI (miyako/ldap-cli).
 //
+// Option values are passed as single --flag=value tokens and positional values after
+// "--", so a value that starts with "-" is never read as an option.
+//
 // Every call runs one short-lived `ldap` process: connect, bind, operate, unbind.
 // No connection state is shared between 4D processes, so an instance can be used
 // from any process, including preemptive ones.
@@ -60,7 +63,7 @@ Function search($base : Text; $filter : Text; $options : Object)->$result : Obje
 	var $command : Collection
 	var $payload : Variant
 	$options:=($options=Null) ? New object : $options
-	$command:=New collection("--format"; "json"; "search")
+	$command:=New collection("--format=json"; "search")
 	This._option($command; "--base"; $base)
 	This._option($command; "--filter"; $filter)
 	This._option($command; "--scope"; $options.scope)
@@ -103,7 +106,7 @@ Function add($dn : Text; $attributes : Object; $options : Object)->$result : Obj
 	// $attributes: {cn: "Ann"; objectClass: ["top"; "person"]; jpegPhoto: 4D.Blob}
 	var $command : Collection
 	var $name : Text
-	$command:=New collection("add"; "--dn"; $dn)
+	$command:=New collection("add"; "--dn="+$dn)
 	For each ($name; $attributes)
 		This._values($command; "--attr"; $name; $attributes[$name]; False)
 	End for each
@@ -114,7 +117,7 @@ Function modify($dn : Text; $changes : Object; $options : Object)->$result : Obj
 	// $changes: {add: {…}; replace: {…}; delete: {attr: Null (all values) | value(s)}; increment: {attr: n}}
 	var $command : Collection
 	var $kind; $name : Text
-	$command:=New collection("modify"; "--dn"; $dn)
+	$command:=New collection("modify"; "--dn="+$dn)
 	For each ($kind; New collection("add"; "replace"; "delete"; "increment"))
 		If (Value type($changes[$kind])=Is object)
 			For each ($name; $changes[$kind])
@@ -128,7 +131,7 @@ Function modify($dn : Text; $changes : Object; $options : Object)->$result : Obj
 Function delete($dn : Text; $options : Object)->$result : Object
 	// $options.subtree: delete the entry and everything below it
 	var $command : Collection
-	$command:=New collection("delete"; "--dn"; $dn)
+	$command:=New collection("delete"; "--dn="+$dn)
 	If (($options#Null) && ($options.subtree=True))
 		$command.push("--subtree")
 	End if
@@ -138,7 +141,7 @@ Function delete($dn : Text; $options : Object)->$result : Object
 Function rename($dn : Text; $newRDN : Text; $options : Object)->$result : Object
 	// $options: {newSuperior: DN template; keepOldRDN: Boolean}
 	var $command : Collection
-	$command:=New collection("modrdn"; "--dn"; $dn; "--new-rdn"; $newRDN)
+	$command:=New collection("modrdn"; "--dn="+$dn; "--new-rdn="+$newRDN)
 	If ($options#Null)
 		This._option($command; "--new-superior"; $options.newSuperior)
 		If ($options.keepOldRDN=True)
@@ -151,7 +154,7 @@ Function rename($dn : Text; $newRDN : Text; $options : Object)->$result : Object
 Function compare($dn : Text; $attribute : Text; $value : Text; $options : Object)->$result : Object
 	// $result.value: True / False (exit code 1 means "false", not a failure)
 	var $command : Collection
-	$command:=New collection("compare"; "--dn"; $dn; "--attr"; $attribute; "--value"; $value)
+	$command:=New collection("compare"; "--dn="+$dn; "--attr="+$attribute; "--value="+$value)
 	This._templateArguments($command; $options)
 	$result:=This.execute($command; $options)
 	Case of
@@ -190,21 +193,21 @@ Function probe()->$result : Object
 	// MARK: - offline helpers (no connection)
 
 Function escapeFilter($value : Text)->$escaped : Text
-	$escaped:=This._offline(New collection("escape"; "filter"; $value))
+	$escaped:=This._offline(New collection("escape"; "filter"; "--"; $value))
 
 Function escapeDN($value : Text)->$escaped : Text
-	$escaped:=This._offline(New collection("escape"; "dn"; $value))
+	$escaped:=This._offline(New collection("escape"; "dn"; "--"; $value))
 
 Function buildDN($template : Text; $args : Object)->$dn : Text
 	var $command : Collection
-	$command:=New collection("dn"; "build"; $template)
+	$command:=New collection("dn"; "build")
 	This._templateArguments($command; New object("args"; $args))
-	$dn:=This._offline($command)
+	$dn:=This._offline($command.push("--"; $template))
 
 Function parseDN($dn : Text)->$rdns : Collection
 	var $result : Object
 	var $payload : Variant
-	$result:=This.execute(New collection("dn"; "parse"; $dn); New object("connect"; False))
+	$result:=This.execute(New collection("dn"; "parse"; "--"; $dn); New object("connect"; False))
 	If ($result.ok)
 		$payload:=This._parse($result.stdout)
 		If (Value type($payload)=Is collection)
@@ -223,10 +226,10 @@ Function _globalArguments()->$arguments : Collection
 	$c:=This.connection
 	$arguments:=New collection
 	For each ($value; This._list($c.uri))
-		$arguments.push("--uri"; $value)
+		$arguments.push("--uri="+$value)
 	End for each
 	For each ($value; This._list($c.caCert))
-		$arguments.push("--ca-cert"; $value)
+		$arguments.push("--ca-cert="+$value)
 	End for each
 	This._option($arguments; "--domain"; $c.domain)
 	This._option($arguments; "--site"; $c.site)
@@ -284,10 +287,10 @@ Function _option($arguments : Collection; $flag : Text; $value : Variant)
 	Case of
 		: (Value type($value)=Is text)
 			If ($value#"")
-				$arguments.push($flag; $value)
+				$arguments.push($flag+"="+$value)
 			End if
 		: ((Value type($value)=Is real) | (Value type($value)=Is longint))
-			$arguments.push($flag; String($value))
+			$arguments.push($flag+"="+String($value))
 	End case
 
 Function _templateArguments($arguments : Collection; $options : Object)
@@ -298,12 +301,12 @@ Function _templateArguments($arguments : Collection; $options : Object)
 	End if
 	If (Value type($options.args)=Is object)
 		For each ($name; $options.args)
-			$arguments.push("--arg"; $name+"="+String($options.args[$name]))
+			$arguments.push("--arg="+$name+"="+String($options.args[$name]))
 		End for each
 	End if
 	If (Value type($options.controls)=Is collection)
 		For each ($name; $options.controls)
-			$arguments.push("--control"; $name)
+			$arguments.push("--control="+$name)
 		End for each
 	End if
 
@@ -313,7 +316,7 @@ Function _values($arguments : Collection; $flag : Text; $name : Text; $value : V
 	var $encoded : Text
 	Case of
 		: ((Value type($value)=Is null) & $nameOnlyIfNull)
-			$arguments.push($flag; $name)
+			$arguments.push($flag+"="+$name)
 		: (Value type($value)=Is collection)
 			For each ($item; $value)
 				This._values($arguments; $flag; $name; $item; False)
@@ -322,10 +325,10 @@ Function _values($arguments : Collection; $flag : Text; $name : Text; $value : V
 			If (OB Instance of($value; 4D.Blob))
 				$blob:=$value
 				BASE64 ENCODE($blob; $encoded)
-				$arguments.push($flag; $name+":=b64:"+$encoded)
+				$arguments.push($flag+"="+$name+":=b64:"+$encoded)
 			End if
 		Else
-			$arguments.push($flag; $name+"="+String($value))
+			$arguments.push($flag+"="+$name+"="+String($value))
 	End case
 
 Function _classify($result : Object)->$classified : Object

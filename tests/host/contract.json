@@ -3,82 +3,291 @@
   "feature": {
     "casesPath": "/cases",
     "cases": [
-      {"stdout": "{\"protocol\":1,\"message\":\"Hello, world!\"}\n", "stderr": "", "exitCode": 0, "value": {"protocol": 1, "message": "Hello, world!"}},
-      {"stdout": "{\"protocol\":1,\"message\":\"Hello, path with spaces!\"}\n", "stderr": "", "exitCode": 0, "value": {"protocol": 1, "message": "Hello, path with spaces!"}},
-      {"stdout": "{\"protocol\":1,\"message\":\"Hello, quote \\\" and \\\\ slash!\"}\n", "stderr": "", "exitCode": 0, "value": {"protocol": 1, "message": "Hello, quote \" and \\ slash!"}},
-      {"stdout": "{\"protocol\":1,\"message\":\"Hello, line\\nbreak!\"}\n", "stderr": "", "exitCode": 0, "value": {"protocol": 1, "message": "Hello, line\nbreak!"}},
-      {"stdout": "{\"protocol\":1,\"message\":\"Hello, 日本語!\"}\n", "stderr": "", "exitCode": 0, "value": {"protocol": 1, "message": "Hello, 日本語!"}},
-      {"stdout": "{\"protocol\":1,\"message\":\"Hello, $() ; & % !!\"}\n", "stderr": "", "exitCode": 0, "value": {"protocol": 1, "message": "Hello, $() ; & % !!"}}
+      {
+        "stdout": "world\n",
+        "stderr": "",
+        "exitCode": 0,
+        "value": "world"
+      },
+      {
+        "stdout": "path with spaces\n",
+        "stderr": "",
+        "exitCode": 0,
+        "value": "path with spaces"
+      },
+      {
+        "stdout": "quote \" and \\5c slash\n",
+        "stderr": "",
+        "exitCode": 0,
+        "value": "quote \" and \\5c slash"
+      },
+      {
+        "stdout": "line\nbreak\n",
+        "stderr": "",
+        "exitCode": 0,
+        "value": "line\nbreak"
+      },
+      {
+        "stdout": "日本語\n",
+        "stderr": "",
+        "exitCode": 0,
+        "value": "日本語"
+      },
+      {
+        "stdout": "$\\28\\29 ; & % !\n",
+        "stderr": "",
+        "exitCode": 0,
+        "value": "$\\28\\29 ; & % !"
+      }
     ],
     "assertions": [
-      {"path": "/invalid/ok", "equals": false},
-      {"path": "/invalid/exitCode", "equals": 2},
-      {"path": "/invalid/stdout", "equals": ""},
-      {"path": "/invalid/stderr", "equals": "{\"protocol\":1,\"error\":{\"code\":\"invalid_arguments\",\"message\":\"expected greet --name <non-empty UTF-8 name> or --version\"}}\n"},
-      {"path": "/invalid/error/code", "equals": "cli_error"},
-      {"path": "/version/ok", "equals": true},
-      {"path": "/version/stdout", "equals": "{\"protocol\":1,\"version\":\"0.1.0\"}\n"},
-      {"path": "/version/stderr", "equals": ""},
-      {"path": "/version/exitCode", "equals": 0},
-      {"path": "/version/value", "equals": {"protocol": 1, "version": "0.1.0"}},
-      {"path": "/protocol/ok", "equals": false},
-      {"path": "/protocol/stdout", "equals": "not json"},
-      {"path": "/protocol/stderr", "equals": ""},
-      {"path": "/protocol/exitCode", "equals": 0},
-      {"path": "/protocol/error/code", "equals": "invalid_protocol"},
-      {"path": "/protocolTypes", "length": 2, "each": [
-        {"path": "/ok", "equals": false},
-        {"path": "/stderr", "equals": ""},
-        {"path": "/exitCode", "equals": 0},
-        {"path": "/error/code", "equals": "invalid_protocol"},
-        {"path": "/error/message", "equals": "Unsupported CLI protocol version"},
-        {"path": "/value", "absent": true}
-      ]},
-      {"path": "/protocolTypes/0/stdout", "equals": "{\"protocol\":true,\"message\":\"invalid\"}"},
-      {"path": "/protocolTypes/1/stdout", "equals": "{\"protocol\":false,\"message\":\"invalid\"}"},
-      {"path": "/protocolNull/ok", "equals": false},
-      {"path": "/protocolNull/stdout", "equals": "{\"protocol\":null,\"message\":\"invalid\"}"},
-      {"path": "/protocolNull/stderr", "equals": ""},
-      {"path": "/protocolNull/exitCode", "equals": 0},
-      {"path": "/protocolNull/error/code", "equals": "invalid_protocol"},
-      {"path": "/protocolNull/error/message", "equals": "Unsupported CLI protocol version"},
-      {"path": "/protocolNull/value", "absent": true},
-      {"path": "/protocolScalars", "length": 5, "each": [
-        {"path": "/ok", "equals": false},
-        {"path": "/stderr", "equals": ""},
-        {"path": "/exitCode", "equals": 0},
-        {"path": "/error/code", "equals": "invalid_protocol"},
-        {"path": "/error/message", "equals": "CLI response must be a JSON object"},
-        {"path": "/value", "absent": true}
-      ]},
-      {"path": "/protocolScalars/0/stdout", "equals": "true"},
-      {"path": "/protocolScalars/1/stdout", "equals": "false"},
-      {"path": "/protocolScalars/2/stdout", "equals": "null"},
-      {"path": "/protocolScalars/3/stdout", "equals": "1"},
-      {"path": "/protocolScalars/4/stdout", "equals": "[]"}
+      {
+        "path": "/version/ok",
+        "equals": true
+      },
+      {
+        "path": "/version/value",
+        "equals": "ldap 0.1.0"
+      },
+      {
+        "path": "/version/stderr",
+        "equals": ""
+      },
+      {
+        "path": "/version/exitCode",
+        "equals": 0
+      },
+      {
+        "path": "/escapedFilter",
+        "equals": "a\\2a\\28b\\29"
+      },
+      {
+        "path": "/escapedDN",
+        "equals": "\\#Smith\\, John"
+      },
+      {
+        "path": "/hyphenFilter",
+        "equals": "--version"
+      },
+      {
+        "path": "/hyphenDN",
+        "equals": "-CN=-x\\,y"
+      },
+      {
+        "path": "/builtDN",
+        "equals": "CN=Smith\\, John,OU=Users,DC=corp"
+      },
+      {
+        "path": "/missingArgDN",
+        "equals": ""
+      },
+      {
+        "path": "/parsedDN",
+        "length": 3
+      },
+      {
+        "path": "/parsedDN/0/0",
+        "equals": {
+          "type": "CN",
+          "value": "Smith, John"
+        }
+      },
+      {
+        "path": "/usage/ok",
+        "equals": false
+      },
+      {
+        "path": "/usage/exitCode",
+        "equals": 2
+      },
+      {
+        "path": "/usage/error/code",
+        "equals": "usage"
+      },
+      {
+        "path": "/usage/stderr",
+        "equals": "ldap: no server given: use --uri, --domain or a profile\n"
+      },
+      {
+        "path": "/connection/ok",
+        "equals": false
+      },
+      {
+        "path": "/connection/exitCode",
+        "equals": 3
+      },
+      {
+        "path": "/connection/error/code",
+        "equals": "connection"
+      },
+      {
+        "path": "/passwordKept",
+        "equals": false
+      },
+      {
+        "path": "/stdinConflict",
+        "equals": {
+          "ok": false,
+          "error": {
+            "code": "invalid_argument",
+            "message": "stdin already carries the bind password"
+          }
+        }
+      },
+      {
+        "path": "/passwordBind/ok",
+        "equals": false
+      },
+      {
+        "path": "/passwordBind/exitCode",
+        "equals": 3
+      },
+      {
+        "path": "/passwordBind/error/code",
+        "equals": "connection"
+      },
+      {
+        "path": "/notLoggedIn/errors/0/errCode",
+        "equals": 1003
+      },
+      {
+        "path": "/notLoggedIn/errors/0/componentSignature",
+        "equals": "ldap"
+      },
+      {
+        "path": "/loginFailed/errors/0/errCode",
+        "equals": 81
+      },
+      {
+        "path": "/loginFailed/errors/0/componentSignature",
+        "equals": "ldap"
+      },
+      {
+        "path": "/notLoggedIn/scope",
+        "equals": "components"
+      },
+      {
+        "path": "/loginFailed/scope",
+        "equals": "components"
+      },
+      {
+        "path": "/notLoggedIn/scope",
+        "equals": "components"
+      },
+      {
+        "path": "/loginFailed/scope",
+        "equals": "components"
+      },
+      {
+        "path": "/sessionAfterFailure",
+        "equals": false
+      }
     ]
   },
   "execution": {
-    "successPaths": ["/fileArgument", "/folderArgument", "/renamedExecutable"],
+    "successPaths": [
+      "/fileArgument",
+      "/folderArgument",
+      "/renamedExecutable"
+    ],
     "assertions": [
-      {"path": "/renamedExecutable", "equals": {"ok": true, "stdout": "{\"protocol\":1,\"version\":\"0.1.0\"}\n", "stderr": "", "exitCode": 0}},
-      {"path": "/missing/ok", "equals": false},
-      {"path": "/missing/error/code", "equals": "missing_executable"},
-      {"path": "/missing/exitCode", "absent": true},
-      {"path": "/unsupported/ok", "equals": false},
-      {"path": "/unsupported/error/code", "equals": "unsupported_architecture"},
-      {"path": "/unsupported/exitCode", "absent": true},
-      {"path": "/launch/ok", "equals": false},
-      {"path": "/launch/error/code", "equals": "launch_failed"},
-      {"path": "/launch/exitCode", "absent": true},
-      {"path": "/rejectedArguments", "length": 9, "each": [
-        {"path": "/result", "equals": {"ok": false, "error": {"code": "invalid_argument", "message": "Arguments must be Text, File or Folder"}}}
-      ]},
-      {"path": "/rejectedNul", "length": 3, "each": [
-        {"path": "", "equals": {"ok": false, "error": {"code": "invalid_argument", "message": "NUL is not permitted in process arguments"}}}
-      ]},
-      {"path": "/missingFile", "equals": {"ok": false, "error": {"code": "invalid_argument", "message": "Executable File and arguments Collection are required"}}},
-      {"path": "/missingArguments", "equals": {"ok": false, "error": {"code": "invalid_argument", "message": "Executable File and arguments Collection are required"}}}
+      {
+        "path": "/renamedExecutable",
+        "equals": {
+          "ok": true,
+          "stdout": "ldap 0.1.0\n",
+          "stderr": "",
+          "exitCode": 0
+        }
+      },
+      {
+        "path": "/missing/ok",
+        "equals": false
+      },
+      {
+        "path": "/missing/error/code",
+        "equals": "missing_executable"
+      },
+      {
+        "path": "/missing/exitCode",
+        "absent": true
+      },
+      {
+        "path": "/unsupported/ok",
+        "equals": false
+      },
+      {
+        "path": "/unsupported/error/code",
+        "equals": "unsupported_architecture"
+      },
+      {
+        "path": "/unsupported/exitCode",
+        "absent": true
+      },
+      {
+        "path": "/launch/ok",
+        "equals": false
+      },
+      {
+        "path": "/launch/error/code",
+        "equals": "launch_failed"
+      },
+      {
+        "path": "/launch/exitCode",
+        "absent": true
+      },
+      {
+        "path": "/rejectedArguments",
+        "length": 9,
+        "each": [
+          {
+            "path": "/result",
+            "equals": {
+              "ok": false,
+              "error": {
+                "code": "invalid_argument",
+                "message": "Arguments must be Text, File or Folder"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "path": "/rejectedNul",
+        "length": 3,
+        "each": [
+          {
+            "path": "",
+            "equals": {
+              "ok": false,
+              "error": {
+                "code": "invalid_argument",
+                "message": "NUL is not permitted in process arguments"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "path": "/missingFile",
+        "equals": {
+          "ok": false,
+          "error": {
+            "code": "invalid_argument",
+            "message": "Executable File and arguments Collection are required"
+          }
+        }
+      },
+      {
+        "path": "/missingArguments",
+        "equals": {
+          "ok": false,
+          "error": {
+            "code": "invalid_argument",
+            "message": "Executable File and arguments Collection are required"
+          }
+        }
+      }
     ]
   }
 }

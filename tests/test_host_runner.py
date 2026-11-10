@@ -163,24 +163,28 @@ class ContractTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 runner.validate_status(status, CONTRACT, False)
 
-    def test_malformed_boolean_protocol_results_require_error_and_retained_status(self):
-        for index in range(2):
-            for key in ("ok", "stdout", "stderr", "exitCode", "error"):
-                status = valid_status()
-                del status["protocolTypes"][index][key]
-                with self.subTest(index=index, key=key), self.assertRaises(ValueError):
-                    runner.validate_status(status, CONTRACT, False)
-            status = valid_status()
-            status["protocolTypes"][index]["value"] = {"protocol": True}
-            with self.assertRaises(ValueError):
-                runner.validate_status(status, CONTRACT, False)
-
-    def test_malformed_null_and_scalar_payloads_cannot_be_success_shaped(self):
-        for path in ("/protocolNull", *(f"/protocolScalars/{index}" for index in range(5))):
+    def test_failed_ldap_results_cannot_be_success_shaped(self):
+        for path in ("/usage", "/connection", "/passwordBind", "/stdinConflict"):
             status = valid_status()
             runner._pointer(status, path)["ok"] = True
             with self.subTest(path=path), self.assertRaises(ValueError):
                 runner.validate_status(status, CONTRACT, False)
+
+    def test_drop_in_errors_require_code_signature_and_component_scope(self):
+        for path, value in (("/notLoggedIn/scope", "local"), ("/loginFailed/scope", ""),
+                            ("/notLoggedIn/errors/0/errCode", 1), ("/loginFailed/errors/0/componentSignature", "4D")):
+            status = valid_status()
+            tokens = path.split("/")[1:]
+            target = status
+            for token in tokens[:-1]:
+                target = target[int(token)] if isinstance(target, list) else target[token]
+            target[tokens[-1]] = value
+            with self.subTest(path=path), self.assertRaises(ValueError):
+                runner.validate_status(status, CONTRACT, False)
+        status = valid_status()
+        status["sessionAfterFailure"] = True
+        with self.assertRaises(ValueError):
+            runner.validate_status(status, CONTRACT, False)
 
     def test_execution_successes_preserve_streams_without_feature_value(self):
         status = valid_status()

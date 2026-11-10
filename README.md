@@ -30,7 +30,7 @@ LDAP_LOGOUT
 | Large directories | Server size limit applies (AD: 1000 entries) | Automatic paging, server-side sort, AD range retrieval for large groups |
 | Isolation | Runs inside the 4D process | Separate process: a hang or crash in the network/TLS stack cannot take 4D down, and a hard timeout kills it |
 | Threads | Not thread safe | Preemptive capable; no shared connection state |
-| Errors | 4D error | Structured result (`ok`, `error.code`, LDAP `resultCode`, stderr), or 4D errors in the drop-ins |
+| Errors | 4D error | Structured result (`ok`, `error.code`, LDAP `resultCode`, stderr); the drop-ins raise 4D errors (caught with `ek errors from components`) |
 | Extending | Not possible | `execute()` reaches every CLI feature today; new functions are a few lines of 4D |
 
 Details: [cs.ldap.LDAP](component/ldap/Documentation/Classes/LDAP.md) ·
@@ -50,16 +50,39 @@ Details: [cs.ldap.LDAP](component/ldap/Documentation/Classes/LDAP.md) ·
 ## Requirements
 
 * 4D 21 LTS, or 4D 20 R2 or later (the drop-ins raise errors with `throw`).
+  The component is compiled with tool4d 21.0 (`package.json.tool`).
 * macOS 11 or later (universal), or Windows x64.
 
-## Status (sketch)
+## How the CLI gets here
 
-* The component compiles with tool4d 21 LTS (macOS arm64 and x86_64).
-* Not yet done: bundling the `ldap-cli` release binaries into `Resources/bin`
-  from pinned, checksummed release assets instead of building `cli/`;
-  replacing the template's CLI contract vectors and host smoke test with LDAP
-  cases (an OpenLDAP `slapd` fixture, as in ldap-cli's integration tests);
-  raising the CI compiler pin from 20.7 LTS; verification against Active Directory.
+The `ldap` executable is not built in this repository.
+[cli/release.json](cli/release.json) pins a release of
+[miyako/ldap-cli](https://github.com/miyako/ldap-cli) and the SHA-256 of each
+asset. `scripts/build_cli.py` (via [scripts/prebuilt_cli.py](scripts/prebuilt_cli.py))
+downloads the asset from github.com, checks the digest, and extracts the
+binary; on macOS it takes each slice out of the signed, notarized universal
+binary, and `ci_config.py assemble` puts the slices back together with their
+signatures intact. To move to a new CLI release, update `cli/release.json`
+(tag, version, digests from the release's `SHA256SUMS.txt`). The CLI keeps its
+own version; releasing the component changes only `template.json` and
+`package.json`.
+
+## Status
+
+Verified locally on macOS arm64 with tool4d 21.0:
+
+* CLI contract vectors (`tests/cli-contract.json`) and quoting round trips
+  against the pinned binary.
+* Real 4D host tests, from source and from the packed, compiled component:
+  offline helpers, error classification (`usage`, `connection`), password
+  handling, hyphen-leading values, and the drop-ins' errors (codes 1003 and 81,
+  delivered to the host's `ek errors from components` handler).
+* The bundled universal binary verifies as notarized Developer ID after
+  packaging.
+
+Not yet verified: macOS Intel and Windows at runtime; anything against a real
+directory server (search, writes, Kerberos, Active Directory). The host tests
+use only offline commands and an unreachable address.
 
 ---
 
@@ -385,7 +408,7 @@ have separate vendor licensing. Never bundle tool4d into the MIT component.
 
 Hosted configuration belongs in the **generated repository** under
 **Settings → Secrets and variables → Actions → Variables → New repository variable**,
-separate from the seven private secrets documented below. Template creation
+separate from the private secrets documented below. Template creation
 does not inherit these variables. Only the hosted 4D opt-in is required; the
 approved public compiler pin is already in `package.json.tool`.
 
@@ -552,7 +575,7 @@ Initialization preserves it. A missing policy or an unlisted version is
 unsigned; malformed policy fails closed. Alternatively, check
 **require_apple_signing** for a manual release dispatch. That flag can only
 escalate, never downgrade the version policy. The policy gate accesses no
-secrets and emits `apple_signing`; only its signed branch receives the seven
+secrets and emits `apple_signing`; only its signed branch receives the
 credentials below. Unsigned CI/local acceptance and unsigned publication need
 none of them. Registering credentials alone does not change the policy.
 
@@ -560,8 +583,8 @@ Follow the canonical [user-owned credential setup and reuse guide](AGENTS.md#use
 before configuring signed releases. It includes the bundled
 [user-run helper](scripts/set-release-secrets.sh), reuse of the existing macOS
 login Keychain service, first-time setup/replacement and troubleshooting.
-The helper uploads six common secrets; this signed workflow also needs the
-user's separately configured `CODESIGN_APPLE_ID`. Agents never execute the helper
+The helper uploads the six required secrets; the signing identity is read
+from the imported certificate, so `CODESIGN_APPLE_ID` is optional. Agents never execute the helper
 or read/set credential values. Secret setup does not authorize publication.
 
 In the **newly generated repository**, register private credentials under
@@ -578,7 +601,7 @@ in source, `package.json`, workflow YAML, logs or a pull request.
 | `NOTARYTOOL_APPLE_ID` | The Apple Account **email address** authorized to notarize for the Developer team. |
 | `NOTARYTOOL_TEAM_ID` | The Apple Developer **Team ID** associated with the signing identity and notarization account. |
 | `NOTARYTOOL_PASSWORD` | An Apple **app-specific password** generated for notarization; **not** the ordinary Apple Account login password. |
-| `CODESIGN_APPLE_ID` | Despite its misleading name, the full **Developer ID Application signing identity**, e.g. `Developer ID Application: Organization (TEAMID)`, or the certificate's SHA-1 identity fingerprint. **Not an email address.** |
+| `CODESIGN_APPLE_ID` | **Optional.** Not needed: the signing identity is read from the temporary keychain that holds the imported `.p12`, which must contain exactly one Developer ID Application identity whose team is `NOTARYTOOL_TEAM_ID`. If set, it pins that identity and the release fails when they differ. Value: the full identity, such as `Developer ID Application: Organization (TEAMID)`, or its SHA-1 fingerprint. **Not an email address.** |
 
 Keep public build configuration separate under **Actions → Variables**:
 `FOURD_ENABLED=true` is the intentional hosted 4D opt-in. The approved public
@@ -637,7 +660,7 @@ Create the destination with **Use this template**, initialize its exact name and
 one selected language, then replace the feature/API/docs/CLI and host contracts.
 Commit the feature, notices and pinned dependencies. Set the generated
 repository's **FOURD_ENABLED=true** variable; choose unsigned policy or commit
-a signed version and register its seven secrets. Run **CI → Run workflow** to
+a signed version and register its six secrets. Run **CI → Run workflow** to
 inspect the compiled ZIP/evidence without publication. After approval, run
 **Publish → Run workflow** on **main**, selecting patch/minor/major and optional
 signing escalation. It bumps and commits the version, builds/tests that exact
