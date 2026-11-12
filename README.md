@@ -23,7 +23,7 @@ LDAP_LOGOUT
 |---|---|---|
 | Operations | Bind and search, read-only | Search, add, modify, delete, rename, compare, password change and reset, Who am I?, any extended operation or control |
 | Encryption | Plaintext on `ldap://` unless you choose `ldaps://` | TLS always: `ldap://` is upgraded with StartTLS; plaintext binds are refused |
-| Authentication | Login and password (DIGEST-MD5 or plain) | Simple bind in TLS, Kerberos/SPNEGO single sign-on, client certificates (`EXTERNAL`), NTLM only on request; TLS channel binding for AD hardening |
+| Authentication | Login and password (DIGEST-MD5 or plain) | Simple bind in TLS, intentional Kerberos/SPNEGO SSO, client certificates (`EXTERNAL`); explicit-user GSSAPI/required-CBT integration is gated on a supporting CLI release (not bundled yet) |
 | Secrets | Passed to the server by the 4D process | Piped to the child process: never on a command line, in the environment, in a profile or on disk. Empty passwords (unauthenticated binds) are rejected |
 | Server identity | Platform library defaults | Verified against the OS trust store (Keychain, Windows store) with hostname verification, optional revocation checks and minimum TLS version; `probe()` shows the chain and fingerprints |
 | LDAP injection | You concatenate filters by hand | Templates escape every value for its context (RFC 4515 filters, RFC 4514 DNs); filters are syntax-checked before sending |
@@ -52,6 +52,27 @@ Details: [cs.ldap.LDAP](component/ldap/Documentation/Classes/LDAP.md) ·
 * 4D 21 LTS, or 4D 20 R2 or later (the drop-ins raise errors with `throw`).
   The component is compiled with tool4d 21.0 (`package.json.tool`).
 * macOS 11 or later (universal), or Windows x64.
+
+## Supplied-user login and hardened AD
+
+The replacement login signature does not change:
+
+```4d
+LDAP_SET_OPTIONS({authMode: "explicit"; mech: "gssapi"; channelBinding: "require"})
+LDAP_LOGIN($url; $userUPN; $password)
+// Existing search/logout code follows unchanged.
+```
+
+This mode uses the supplied user's UPN/password, not service-account SSO.
+Missing credentials fail at login; passwords never force SASL back to simple.
+Simple bind over TLS remains the compatibility default. Intentional SSO selects
+`authMode: "sso"` and empty login/password.
+
+**Dependency integration pending:** the pinned CLI v0.1.0 does not provide the
+required strict capabilities. These calls currently fail closed before sending
+the password, rather than pretending hardened-AD support. A supporting upstream
+release must be pinned and validated. Real AD **Always**-enforced acceptance on
+macOS/Windows remains outstanding; see [authentication modes](docs/migration.md#authentication-modes).
 
 ## How the CLI gets here
 

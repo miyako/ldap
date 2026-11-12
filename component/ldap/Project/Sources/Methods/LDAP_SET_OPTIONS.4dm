@@ -2,6 +2,7 @@
 // Connection options for the next LDAP_LOGIN in this process, e.g.
 // LDAP_SET_OPTIONS({caCert: $pem; tlsServerName: "dc1.corp.example"; operationTimeout: 30})
 // LDAP_SET_OPTIONS({domain: "corp.example"; mech: "gssapi"}) then LDAP_LOGIN(""; ""; "") for Kerberos SSO.
+// LDAP_SET_OPTIONS({authMode: "explicit"}) selects supplied-user GSSAPI + required CBT.
 // Accepts every cs.ldap.LDAP connection property except password.
 #DECLARE($options : Object)
 var ldap_Options : Object
