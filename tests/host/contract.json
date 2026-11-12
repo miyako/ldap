@@ -286,6 +286,14 @@
         "equals": 89
       },
       {
+        "path": "/identityOverrideRejected/errors/0/errCode",
+        "equals": 89
+      },
+      {
+        "path": "/invalidMechanismType/errors/0/errCode",
+        "equals": 89
+      },
+      {
         "path": "/explicitSessionAfterFailure",
         "equals": false
       }

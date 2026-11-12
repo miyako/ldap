@@ -14,6 +14,7 @@ var $connection : Object
 var $session : cs.LDAP
 var $result : Object
 var $explicit : Boolean
+var $name : Text
 ldap_Current:=Null
 $connection:=(ldap_Options=Null) ? New object : OB Copy(ldap_Options)
 Case of
@@ -23,6 +24,14 @@ Case of
 		throw(New object("errCode"; 89; "message"; "LDAP_LOGIN: an empty url needs a domain: call LDAP_SET_OPTIONS({domain: \"corp.example\"}) first"; "componentSignature"; "ldap"))
 		return
 End case
+For each ($name; New collection("authMode"; "mech"; "channelBinding"))
+	If ($connection[$name]#Null)
+		If (Value type($connection[$name])#Is text)
+			cs._Compat.new().raise(New object("ok"; False; "error"; New object("code"; "usage"; "message"; $name+" must be Text")))
+			return
+		End if
+	End if
+End for each
 $explicit:=($connection.authMode="explicit") | (($connection.channelBinding="require") & ($connection.authMode#"sso")) | (($password#"") & ($connection.mech#Null) & ($connection.mech#"simple"))
 Case of
 	: ($connection.authMode="sso")
@@ -34,7 +43,6 @@ Case of
 		$connection.authMode:="explicit"
 		$connection.user:=$login
 		$connection.password:=$password
-		OB REMOVE($connection; "bindDN")
 	: ($password#"")
 		$connection.mech:="simple"
 		$connection.bindDN:=$login

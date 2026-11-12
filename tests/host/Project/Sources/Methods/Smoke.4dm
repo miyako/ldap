@@ -159,6 +159,14 @@ HOST_Errors:=Null
 LDAP_SET_OPTIONS(New object("authMode"; "sso"; "mech"; "gssapi"))
 LDAP_LOGIN("ldaps://127.0.0.1:1"; "alice@CORP.EXAMPLE"; "alice-secret")
 $report.ssoCredentialsRejected:=New object("errors"; HOST_Errors)
+HOST_Errors:=Null
+LDAP_SET_OPTIONS(New object("authMode"; "explicit"; "bindDN"; "CN=service"))
+LDAP_LOGIN("ldaps://127.0.0.1:1"; "alice@CORP.EXAMPLE"; "alice-secret")
+$report.identityOverrideRejected:=New object("errors"; HOST_Errors)
+HOST_Errors:=Null
+LDAP_SET_OPTIONS(New object("mech"; 123))
+LDAP_LOGIN("ldaps://127.0.0.1:1"; "alice@CORP.EXAMPLE"; "alice-secret")
+$report.invalidMechanismType:=New object("errors"; HOST_Errors)
 LDAP_SET_OPTIONS(Null)
 HOST_Errors:=Null
 ON ERR CALL(""; ek errors from components)
