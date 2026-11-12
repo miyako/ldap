@@ -262,6 +262,22 @@
         "equals": true
       },
       {
+        "path": "/unsupportedCapability/ok",
+        "equals": false
+      },
+      {
+        "path": "/unsupportedCapability/error/code",
+        "equals": "unsupported"
+      },
+      {
+        "path": "/unsupportedCapability/error/details/code",
+        "equals": "cli_error"
+      },
+      {
+        "path": "/unsupportedCapability/exitCode",
+        "equals": 2
+      },
+      {
         "path": "/explicitMissingPassword/errors/0/errCode",
         "equals": 49
       },

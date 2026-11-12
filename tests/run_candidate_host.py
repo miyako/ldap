@@ -69,6 +69,11 @@ def main():
             executable.parent.mkdir(parents=True)
             executable.write_bytes(binary)
             executable.chmod(0o755)
+            version = subprocess.run([str(executable), "--version"], check=True,
+                                     capture_output=True, text=True, timeout=20).stdout
+            if not re.fullmatch(r"ldap [0-9]+\.[0-9]+\.[0-9]+\n", version):
+                raise ValueError("candidate version must identify ldap and a stable version")
+            report["candidate"]["version"] = version.strip()
             config = {key: os.environ[env] for key, env in (
                 ("uri", "LDAP_TEST_URI"), ("caCert", "LDAP_TEST_CA_CERT"), ("base", "LDAP_TEST_BASE"),
                 ("userA", "LDAP_TEST_USER_A"), ("userB", "LDAP_TEST_USER_B"),
@@ -96,6 +101,11 @@ def main():
             for assertion in contract["feature"]["assertions"]:
                 if assertion["path"] in updates:
                     assertion["equals"] = updates[assertion["path"]]
+                if assertion["path"] == "/version/value":
+                    assertion["equals"] = version.strip()
+            for assertion in contract["execution"]["assertions"]:
+                if assertion["path"] == "/renamedExecutable":
+                    assertion["equals"]["stdout"] = version
             def expect(path, value):
                 contract["feature"]["assertions"].append({"path": "/candidate/" + path, "equals": value})
             for field, user, identity, uid in (

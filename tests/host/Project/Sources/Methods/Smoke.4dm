@@ -120,6 +120,8 @@ $capability:=New object("ok"; True; "stdout"; "{\"schema\":1,\"features\":[\"exp
 $report.capabilityAccepted:=$explicit._checkCapabilities($capability; True).ok
 $capability:=New object("ok"; True; "stdout"; "{\"schema\":1,\"features\":[\"channel-binding-require\"]}"; "stderr"; ""; "exitCode"; 0)
 $report.ssoCapabilityAccepted:=$explicit._checkCapabilities($capability; False).ok
+$capability:=New object("ok"; False; "stdout"; ""; "stderr"; "unknown command: capabilities"; "exitCode"; 2; "error"; New object("code"; "cli_error"; "message"; "unknown command: capabilities"))
+$report.unsupportedCapability:=$explicit._checkCapabilities($capability; True)
 HOST_Phase:="drop-in replacements"
 // Component errors reach the host handler installed with ek errors from components,
 // not the ek local one (with only a local handler the calling method is aborted).
