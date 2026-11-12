@@ -101,6 +101,33 @@ generic simple-bind compatibility. Record AD policy, OS/4D/CLI versions, intende
 and observed identities, and server-side evidence. Absence of audit event 3075
 alone is insufficient ([Microsoft reference](https://learn.microsoft.com/en-us/windows-server/identity/ad-ds/ldap-channel-binding)).
 
+### Development-candidate integration (test only)
+
+`tests/run_candidate_host.py` is an opt-in hook for the CLI repository's bounded
+`tests/integration/kerberos-macos.sh` fixture. Set `LDAP_KERBEROS_TEST_HOOK` to
+the hook's absolute executable path, and provide `LDAP_CANDIDATE`,
+`LDAP_CANDIDATE_SHA256` and the full source commit `LDAP_CANDIDATE_REVISION`.
+The CLI fixture exports synthetic Alice/Bob credentials, expected server
+identities, CA and endpoint through `LDAP_TEST_*`; its KDC/slapd services exist
+only while the hook runs. `TOOL4D` may select the pinned local compiler.
+
+The hook copies the component into test-owned staging, installs only the
+hash-verified native candidate at that copy's normal resource path, and keeps
+capability and authentication checks active. It runs the real source host,
+compiles fresh, then uses the existing 4DZ layout/ZIP writer for a source-stripped,
+native-only compiled fixture with external Libraries. It does not construct
+a cross-platform release ZIP, invent foreign slices or weaken release validation.
+
+Checks include supplied-user login/search/Who Am I, wrong and missing passwords,
+trust/hostname failures, two independent 4D worker processes, preservation of
+the main process's identity, and a failed relogin clearing its old session.
+Reports, candidate provenance and unchanged production-file hashes are saved
+under `build/candidate-host-integration/`, including failed-stage diagnostics.
+Neither `cli/release.json`, normal bundled resources nor an existing accepted
+preview is changed. An unsigned local candidate with MIT KDC/OpenLDAP is
+development evidence only: it is not AD Always-policy, Windows, publication,
+signing or Dependency Manager acceptance.
+
 ## Errors
 
 Failures raise 4D errors, as the built-in commands do, but they are raised

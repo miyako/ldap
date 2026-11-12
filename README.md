@@ -101,9 +101,17 @@ Verified locally on macOS arm64 with tool4d 21.0:
 * The bundled universal binary verifies as notarized Developer ID after
   packaging.
 
-Not yet verified: macOS Intel and Windows at runtime; anything against a real
-directory server (search, writes, Kerberos, Active Directory). The host tests
-use only offline commands and an unreachable address.
+Separate development-candidate verification uses a test-owned native-only copy,
+not the pinned release: real source and source-stripped compiled 4D hosts passed
+supplied-user login/search/Who Am I, password and TLS failures, and two-worker
+session isolation against a local MIT KDC/OpenLDAP fixture. See the opt-in
+[candidate integration hook](docs/migration.md#development-candidate-integration-test-only).
+
+Not yet verified: this component on native macOS Intel/Windows, deployed
+directories and AD **Always**-enforced policy, writes, or Dependency Manager
+installation of a supporting CLI release. The normal release-pin host tests
+still use offline commands and an unreachable address. The unsigned development
+candidate is not a release dependency and does not change `cli/release.json`.
 
 ---
 
