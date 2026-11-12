@@ -47,7 +47,7 @@
       },
       {
         "path": "/version/value",
-        "equals": "ldap 0.1.0"
+        "equals": "ldap 0.2.0"
       },
       {
         "path": "/version/stderr",
@@ -181,6 +181,149 @@
       {
         "path": "/sessionAfterFailure",
         "equals": false
+      },
+      {
+        "path": "/explicitArguments",
+        "equals": ["--uri=ldaps://127.0.0.1:1", "--mech=gssapi", "--user=alice@CORP.EXAMPLE", "--channel-binding=require", "--password-stdin"]
+      },
+      {
+        "path": "/otherArguments",
+        "equals": ["--uri=ldaps://127.0.0.1:1", "--mech=gssapi", "--user=bob@CORP.EXAMPLE", "--channel-binding=require", "--password-stdin"]
+      },
+      {
+        "path": "/explicitPolicy",
+        "equals": {"ok": true, "explicit": true, "strict": true}
+      },
+      {
+        "path": "/ssoPolicy",
+        "equals": {"ok": true, "explicit": false, "strict": true}
+      },
+      {
+        "path": "/explicitPasswordKept",
+        "equals": false
+      },
+      {
+        "path": "/independentPasswords",
+        "equals": true
+      },
+      {
+        "path": "/bundledCapabilities/ok",
+        "equals": true
+      },
+      {
+        "path": "/bundledCapabilities/stdout",
+        "equals": "{\"features\":[\"explicit-credentials-sasl\",\"channel-binding-require\"],\"schema\":1}\n"
+      },
+      {
+        "path": "/bundledCapabilities/exitCode",
+        "equals": 0
+      },
+      {
+        "path": "/strictConnection/ok",
+        "equals": false
+      },
+      {
+        "path": "/strictConnection/error/code",
+        "equals": "connection"
+      },
+      {
+        "path": "/strictConnection/exitCode",
+        "equals": 3
+      },
+      {"path": "/strictCompare/ok", "equals": false},
+      {"path": "/strictCompare/value", "absent": true},
+      {"path": "/commandOverride/error/code", "equals": "usage"},
+      {"path": "/commandOverride/exitCode", "absent": true},
+      {"path": "/shortOverride/error/code", "equals": "usage"},
+      {"path": "/tlsDowngrade/error/code", "equals": "usage"},
+      {
+        "path": "/authRejected",
+        "length": 8,
+        "each": [
+          {"path": "/ok", "equals": false},
+          {"path": "/exitCode", "absent": true}
+        ]
+      },
+      {"path": "/authRejected/0/error/code", "equals": "authentication"},
+      {"path": "/authRejected/1/error/code", "equals": "authentication"},
+      {"path": "/authRejected/2/error/code", "equals": "usage"},
+      {"path": "/authRejected/3/error/code", "equals": "usage"},
+      {"path": "/authRejected/4/error/code", "equals": "usage"},
+      {"path": "/authRejected/5/error/code", "equals": "usage"},
+      {"path": "/authRejected/6/error/code", "equals": "usage"},
+      {"path": "/authRejected/7/error/code", "equals": "usage"},
+      {
+        "path": "/capabilityRejected",
+        "length": 8,
+        "each": [{"path": "/ok", "equals": false}]
+      },
+      {"path": "/capabilityRejected/0/error/code", "equals": "invalid_protocol"},
+      {"path": "/capabilityRejected/1/error/code", "equals": "invalid_protocol"},
+      {"path": "/capabilityRejected/2/error/code", "equals": "invalid_protocol"},
+      {"path": "/capabilityRejected/3/error/code", "equals": "invalid_protocol"},
+      {"path": "/capabilityRejected/4/error/code", "equals": "invalid_protocol"},
+      {"path": "/capabilityRejected/5/error/code", "equals": "invalid_protocol"},
+      {"path": "/capabilityRejected/6/error/code", "equals": "unsupported"},
+      {"path": "/capabilityRejected/7/error/code", "equals": "unsupported"},
+      {
+        "path": "/capabilityAccepted",
+        "equals": true
+      },
+      {
+        "path": "/ssoCapabilityAccepted",
+        "equals": true
+      },
+      {
+        "path": "/unsupportedCapability/ok",
+        "equals": false
+      },
+      {
+        "path": "/unsupportedCapability/error/code",
+        "equals": "unsupported"
+      },
+      {
+        "path": "/unsupportedCapability/error/details/code",
+        "equals": "cli_error"
+      },
+      {
+        "path": "/unsupportedCapability/exitCode",
+        "equals": 2
+      },
+      {
+        "path": "/explicitMissingPassword/errors/0/errCode",
+        "equals": 49
+      },
+      {
+        "path": "/explicitMissingUser/errors/0/errCode",
+        "equals": 49
+      },
+      {
+        "path": "/explicitLoginGate/errors/0/errCode",
+        "equals": 81
+      },
+      {
+        "path": "/saslPasswordLogin/errors/0/errCode",
+        "equals": 81
+      },
+      {
+        "path": "/strictMissingPassword/errors/0/errCode",
+        "equals": 49
+      },
+      {
+        "path": "/ssoCredentialsRejected/errors/0/errCode",
+        "equals": 89
+      },
+      {
+        "path": "/identityOverrideRejected/errors/0/errCode",
+        "equals": 89
+      },
+      {
+        "path": "/invalidMechanismType/errors/0/errCode",
+        "equals": 89
+      },
+      {
+        "path": "/explicitSessionAfterFailure",
+        "equals": false
       }
     ]
   },
@@ -195,7 +338,7 @@
         "path": "/renamedExecutable",
         "equals": {
           "ok": true,
-          "stdout": "ldap 0.1.0\n",
+          "stdout": "ldap 0.2.0\n",
           "stderr": "",
           "exitCode": 0
         }

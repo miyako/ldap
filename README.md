@@ -7,14 +7,15 @@ It runs [miyako/ldap-cli](https://github.com/miyako/ldap-cli), a signed native
 executable bundled in `Resources/bin`, as a separate process.
 
 ```4d
-// Kerberos single sign-on: no password stored or typed
-$ldap:=cs.ldap.LDAP.new({domain: "corp.example"; mech: "gssapi"})
-$result:=$ldap.search(""; "(&(objectClass=user)(sAMAccountName={u}))"; {scope: "sub"; args: {u: $input}; attributes: ["mail"; "memberOf"]})
-
-// Existing code: rename LDAP LOGIN → LDAP_LOGIN, pass arrays as pointers
-LDAP_LOGIN("ldaps://dc1.corp.example"; "CORP\\jdoe"; $password)
+// Supplied application-user password, with required SASL channel binding:
+LDAP_SET_OPTIONS({authMode: "explicit"; mech: "gssapi"; channelBinding: "require"})
+LDAP_LOGIN("ldaps://dc1.corp.example"; "jdoe@CORP.EXAMPLE"; $password)
 LDAP_SEARCH_ALL("DC=corp,DC=example"; ->$_entry; "(objectClass=user)"; LDAP all levels; ->$attrs)
 LDAP_LOGOUT
+
+// Intentional Kerberos SSO is a separate choice, not a password-login replacement:
+$ldap:=cs.ldap.LDAP.new({domain: "corp.example"; authMode: "sso"; mech: "gssapi"})
+$result:=$ldap.search(""; "(&(objectClass=user)(sAMAccountName={u}))"; {scope: "sub"; args: {u: $input}; attributes: ["mail"; "memberOf"]})
 ```
 
 ## Why use it instead of the built-in commands
@@ -23,7 +24,7 @@ LDAP_LOGOUT
 |---|---|---|
 | Operations | Bind and search, read-only | Search, add, modify, delete, rename, compare, password change and reset, Who am I?, any extended operation or control |
 | Encryption | Plaintext on `ldap://` unless you choose `ldaps://` | TLS always: `ldap://` is upgraded with StartTLS; plaintext binds are refused |
-| Authentication | Login and password (DIGEST-MD5 or plain) | Simple bind in TLS, Kerberos/SPNEGO single sign-on, client certificates (`EXTERNAL`), NTLM only on request; TLS channel binding for AD hardening |
+| Authentication | Login and password (DIGEST-MD5 or plain) | Supplied-user GSSAPI with required CBT, compatibility simple bind in TLS, intentional Kerberos/SPNEGO SSO, client certificates (`EXTERNAL`) |
 | Secrets | Passed to the server by the 4D process | Piped to the child process: never on a command line, in the environment, in a profile or on disk. Empty passwords (unauthenticated binds) are rejected |
 | Server identity | Platform library defaults | Verified against the OS trust store (Keychain, Windows store) with hostname verification, optional revocation checks and minimum TLS version; `probe()` shows the chain and fingerprints |
 | LDAP injection | You concatenate filters by hand | Templates escape every value for its context (RFC 4515 filters, RFC 4514 DNs); filters are syntax-checked before sending |
@@ -53,6 +54,29 @@ Details: [cs.ldap.LDAP](component/ldap/Documentation/Classes/LDAP.md) ·
   The component is compiled with tool4d 21.0 (`package.json.tool`).
 * macOS 11 or later (universal), or Windows x64.
 
+## Supplied-user login and hardened AD
+
+The replacement login signature does not change:
+
+```4d
+LDAP_SET_OPTIONS({authMode: "explicit"; mech: "gssapi"; channelBinding: "require"})
+LDAP_LOGIN($url; $userUPN; $password)
+// Existing search/logout code follows unchanged.
+```
+
+This mode uses the supplied user's UPN/password, not service-account SSO.
+Missing credentials fail at login; passwords never force SASL back to simple.
+Simple bind over TLS remains the compatibility default. Intentional SSO selects
+`authMode: "sso"` and empty login/password.
+
+The bundled [CLI v0.2.0](https://github.com/miyako/ldap-cli/releases/tag/v0.2.0)
+provides explicit-password GSSAPI and required CBT without preexisting tickets.
+Every strict operation still checks offline capabilities before sending a
+password; unsupported or malformed responses fail closed. Use a UPN, verified
+LDAPS or StartTLS, and a trusted server certificate. Real AD
+**Always**-enforced acceptance on macOS/Windows remains outstanding; see
+[authentication modes](docs/migration.md#authentication-modes).
+
 ## How the CLI gets here
 
 The `ldap` executable is not built in this repository.
@@ -67,6 +91,14 @@ signatures intact. To move to a new CLI release, update `cli/release.json`
 own version; releasing the component changes only `template.json` and
 `package.json`.
 
+The current upstream tag is bound to source commit
+`0627e38b4742065d6733b4ad82c35e54a64f6eb2`; its
+[official release run](https://github.com/miyako/ldap-cli/actions/runs/43159013347)
+signed and notarized the macOS universal CLI. The downloaded macOS and Windows
+x64 archives were checked against both the published checksum manifest and
+GitHub asset digests. Native dependency pins and bundled redistribution notices
+are unchanged; GSS uses the macOS system framework.
+
 ## Status
 
 Verified locally on macOS arm64 with tool4d 21.0:
@@ -77,12 +109,23 @@ Verified locally on macOS arm64 with tool4d 21.0:
   offline helpers, error classification (`usage`, `connection`), password
   handling, hyphen-leading values, and the drop-ins' errors (codes 1003 and 81,
   delivered to the host's `ek errors from components` handler).
-* The bundled universal binary verifies as notarized Developer ID after
-  packaging.
+* The assembled universal CLI retains a valid Developer ID signature.
+  Notarization was accepted by the upstream CLI release workflow; it does not
+  constitute signing or Gatekeeper acceptance of this component package.
 
-Not yet verified: macOS Intel and Windows at runtime; anything against a real
-directory server (search, writes, Kerberos, Active Directory). The host tests
-use only offline commands and an unreachable address.
+The published v0.2.0 executable was also retested in a separate test-owned
+native-only copy: real source and source-stripped compiled 4D hosts passed
+supplied-user login/search/Who Am I, password and TLS failures, and two-worker
+session isolation against a local MIT KDC/OpenLDAP fixture. This supplements
+the earlier unsigned-candidate checks, not AD acceptance. See the opt-in
+[candidate integration hook](docs/migration.md#development-candidate-integration-test-only).
+
+Not yet verified: this component on native macOS Intel/Windows, deployed
+directories and AD **Always**-enforced policy, writes, or Dependency Manager
+installation. The normal release-pin host tests use offline capabilities/helpers
+and an unreachable address; they do not prove AD policy enforcement. The earlier
+unsigned development candidate is not the release dependency: normal packaging
+now uses only the genuine v0.2.0 assets pinned in `cli/release.json`.
 
 ---
 

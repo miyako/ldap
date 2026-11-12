@@ -2,8 +2,9 @@
 var $ignored : Integer
 var $parameter; $name; $target : Text
 var $folderPath : Text
-var $request; $result; $report : Object
+var $request; $result; $report; $options; $capability : Object
 var $tool; $secret : cs.ldap.LDAP
+var $explicit; $other : cs.ldap.LDAP
 var $ignoredObject : Object
 var HOST_Errors : Collection
 var HOST_ErrorScope : Text
@@ -81,6 +82,47 @@ $secret:=cs.ldap.LDAP.new(New object("target"; $target; "uri"; "ldaps://127.0.0.
 $report.passwordKept:=($secret.connection.password#Null)
 $report.stdinConflict:=$secret.execute(New collection("whoami"); New object("stdin"; "x"))
 $report.passwordBind:=$secret.whoami()
+HOST_Phase:="authentication modes"
+$options:=New object("target"; $target; "uri"; "ldaps://127.0.0.1:1"; "authMode"; "explicit"; "user"; "alice@CORP.EXAMPLE"; "password"; "alice-secret")
+$explicit:=cs.ldap.LDAP.new($options)
+$options.user:="bob@CORP.EXAMPLE"
+$options.password:="bob-secret"
+$other:=cs.ldap.LDAP.new($options)
+$report.explicitArguments:=$explicit._globalArguments()
+$report.otherArguments:=$other._globalArguments()
+$report.explicitPolicy:=$explicit._authentication()
+$report.explicitPasswordKept:=($explicit.connection.password#Null)
+$report.independentPasswords:=($explicit._password#"") & ($other._password#"") & ($explicit._password#$other._password)
+$report.bundledCapabilities:=$explicit._checkCapabilities(cs.ldap._CLI.new("ldap"; $target).execute(New collection("capabilities")); True)
+$report.strictConnection:=$explicit.whoami()
+$report.strictCompare:=$explicit.compare("DC=corp"; "cn"; "alice")
+$report.commandOverride:=$explicit.execute(New collection("--channel-binding=none"; "whoami"))
+$report.shortOverride:=$explicit.execute(New collection("-Msimple"; "whoami"))
+$report.tlsDowngrade:=cs.ldap.LDAP.new(New object("authMode"; "explicit"; "user"; "alice@CORP.EXAMPLE"; "password"; "x"; "tls"; "none")).whoami()
+$report.authRejected:=New collection
+For each ($options; New collection(\
+	New object("authMode"; "explicit"; "user"; "alice@CORP.EXAMPLE"); \
+	New object("authMode"; "explicit"; "password"; "x"); \
+	New object("authMode"; "explicit"; "user"; "CORP\\alice"; "password"; "x"); \
+	New object("authMode"; "explicit"; "user"; "alice@CORP.EXAMPLE"; "password"; "x"; "mech"; "simple"); \
+	New object("authMode"; "explicit"; "user"; "alice@CORP.EXAMPLE"; "password"; "x"; "insecureSkipVerify"; True); \
+	New object("authMode"; "explicit"; "user"; "alice@CORP.EXAMPLE"; "password"; "x"; "ccache"; "shared-cache"); \
+	New object("authMode"; "sso"; "mech"; "gssapi"; "password"; "x"); \
+	New object("authMode"; 123)))
+	$report.authRejected.push(cs.ldap.LDAP.new($options).whoami())
+End for each
+$report.ssoPolicy:=cs.ldap.LDAP.new(New object("authMode"; "sso"; "mech"; "gssapi"; "channelBinding"; "require"))._authentication()
+$report.capabilityRejected:=New collection
+For each ($name; New collection("not json"; "[]"; "{\"schema\":\"1\",\"features\":[]}"; "{\"schema\":2,\"features\":[]}"; "{\"schema\":1,\"features\":\"wrong\"}"; "{\"schema\":1,\"features\":[123]}"; "{\"schema\":1,\"features\":[\"channel-binding-require\"]}"; "{\"schema\":1,\"features\":[\"CHANNEL-BINDING-REQUIRE\",\"explicit-credentials-sasl\"]}"))
+	$capability:=New object("ok"; True; "stdout"; $name; "stderr"; ""; "exitCode"; 0)
+	$report.capabilityRejected.push($explicit._checkCapabilities($capability; True))
+End for each
+$capability:=New object("ok"; True; "stdout"; "{\"schema\":1,\"features\":[\"explicit-credentials-sasl\",\"channel-binding-require\"]}"; "stderr"; ""; "exitCode"; 0)
+$report.capabilityAccepted:=$explicit._checkCapabilities($capability; True).ok
+$capability:=New object("ok"; True; "stdout"; "{\"schema\":1,\"features\":[\"channel-binding-require\"]}"; "stderr"; ""; "exitCode"; 0)
+$report.ssoCapabilityAccepted:=$explicit._checkCapabilities($capability; False).ok
+$capability:=New object("ok"; False; "stdout"; ""; "stderr"; "unknown command: capabilities"; "exitCode"; 2; "error"; New object("code"; "cli_error"; "message"; "unknown command: capabilities"))
+$report.unsupportedCapability:=$explicit._checkCapabilities($capability; True)
 HOST_Phase:="drop-in replacements"
 // Component errors reach the host handler installed with ek errors from components,
 // not the ek local one (with only a local handler the calling method is aborted).
@@ -95,6 +137,40 @@ HOST_ErrorScope:=""
 LDAP_LOGIN("ldaps://127.0.0.1:1"; "cn=a"; "s3cret")
 $report.loginFailed:=New object("scope"; HOST_ErrorScope; "errors"; HOST_Errors)
 $report.sessionAfterFailure:=(LDAP_Session()#Null)
+HOST_Errors:=Null
+$options:=New object("authMode"; "explicit")
+LDAP_SET_OPTIONS($options)
+$options.authMode:="sso"
+LDAP_LOGIN("ldaps://127.0.0.1:1"; "alice@CORP.EXAMPLE"; "")
+$report.explicitMissingPassword:=New object("errors"; HOST_Errors)
+HOST_Errors:=Null
+LDAP_LOGIN("ldaps://127.0.0.1:1"; ""; "alice-secret")
+$report.explicitMissingUser:=New object("errors"; HOST_Errors)
+HOST_Errors:=Null
+LDAP_LOGIN("ldaps://127.0.0.1:1"; "alice@CORP.EXAMPLE"; "alice-secret")
+$report.explicitLoginGate:=New object("errors"; HOST_Errors)
+$report.explicitSessionAfterFailure:=(LDAP_Session()#Null)
+HOST_Errors:=Null
+LDAP_SET_OPTIONS(New object("mech"; "gssapi"))
+LDAP_LOGIN("ldaps://127.0.0.1:1"; "alice@CORP.EXAMPLE"; "alice-secret")
+$report.saslPasswordLogin:=New object("errors"; HOST_Errors)
+HOST_Errors:=Null
+LDAP_SET_OPTIONS(New object("mech"; "gssapi"; "channelBinding"; "require"))
+LDAP_LOGIN("ldaps://127.0.0.1:1"; "alice@CORP.EXAMPLE"; "")
+$report.strictMissingPassword:=New object("errors"; HOST_Errors)
+HOST_Errors:=Null
+LDAP_SET_OPTIONS(New object("authMode"; "sso"; "mech"; "gssapi"))
+LDAP_LOGIN("ldaps://127.0.0.1:1"; "alice@CORP.EXAMPLE"; "alice-secret")
+$report.ssoCredentialsRejected:=New object("errors"; HOST_Errors)
+HOST_Errors:=Null
+LDAP_SET_OPTIONS(New object("authMode"; "explicit"; "bindDN"; "CN=service"))
+LDAP_LOGIN("ldaps://127.0.0.1:1"; "alice@CORP.EXAMPLE"; "alice-secret")
+$report.identityOverrideRejected:=New object("errors"; HOST_Errors)
+HOST_Errors:=Null
+LDAP_SET_OPTIONS(New object("mech"; 123))
+LDAP_LOGIN("ldaps://127.0.0.1:1"; "alice@CORP.EXAMPLE"; "alice-secret")
+$report.invalidMechanismType:=New object("errors"; HOST_Errors)
+LDAP_SET_OPTIONS(Null)
 HOST_Errors:=Null
 ON ERR CALL(""; ek errors from components)
 ON ERR CALL("Host_error"; ek local)

@@ -206,22 +206,6 @@
 		}
 	},
 	"LDAP": {
-		"escapeFilter()": {
-			"Syntax": "**.escapeFilter**( *value* : Text )->escaped : Text",
-			"Params": [
-				[
-					"value",
-					"Text",
-					"->"
-				],
-				[
-					"escaped",
-					"Text",
-					"<-"
-				]
-			],
-			"Summary": ""
-		},
 		"version()": {
 			"Syntax": "**.version**()->result : Object",
 			"Params": [
@@ -375,6 +359,22 @@
 				[
 					"result",
 					"Object",
+					"<-"
+				]
+			],
+			"Summary": ""
+		},
+		"escapeFilter()": {
+			"Syntax": "**.escapeFilter**( *value* : Text )->escaped : Text",
+			"Params": [
+				[
+					"value",
+					"Text",
+					"->"
+				],
+				[
+					"escaped",
+					"Text",
 					"<-"
 				]
 			],

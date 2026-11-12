@@ -1,17 +1,17 @@
 {
   "schema": 1,
   "repository": "miyako/ldap-cli",
-  "tag": "v0.1.0",
-  "version": "0.1.0",
+  "tag": "v0.2.0",
+  "version": "0.2.0",
   "assets": {
     "macos": {
-      "name": "ldap-0.1.0-macos-universal.zip",
-      "sha256": "a5087fde1af277672a27f4b2bff7a2721b4df77ccf1c350ebdceebe67a4f0606",
+      "name": "ldap-0.2.0-macos-universal.zip",
+      "sha256": "0b9f11a0c6b0f354bb5c702b7681f58f795b84d1274769eb87222ded6b3deca6",
       "member": "ldap"
     },
     "windows-x64": {
-      "name": "ldap-0.1.0-windows-x64.zip",
-      "sha256": "5ba1be064196740c6e7ee9f407f129fff4dcc57d94f840f5f5ea727fe4f44bb0",
+      "name": "ldap-0.2.0-windows-x64.zip",
+      "sha256": "0311c1f86fc2480d6da94b3599055e5d59889fb1c6911d3d39dc2565f4083be8",
       "member": "ldap.exe"
     }
   }

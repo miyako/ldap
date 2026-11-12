@@ -11,6 +11,17 @@
   },
   {
    "args": [
+    "capabilities"
+   ],
+   "exitCode": 0,
+   "stdout": {
+    "features": ["explicit-credentials-sasl", "channel-binding-require"],
+    "schema": 1
+   },
+   "stderr": ""
+  },
+  {
+   "args": [
     "escape",
     "filter",
     "a*(b)\\"
