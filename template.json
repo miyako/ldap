@@ -6,6 +6,6 @@
   "cli": "ldap",
   "language": "rust",
   "feature": "LDAP client API and drop-in replacements for the built-in LDAP commands, backed by miyako/ldap-cli",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "feature_class": "LDAP"
 }

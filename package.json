@@ -1,6 +1,6 @@
 {
   "name": "ldap",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "private": true,
   "description": "LDAP client API and drop-in replacements for the built-in LDAP commands, backed by miyako/ldap-cli",
   "license": "MIT",
