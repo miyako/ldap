@@ -76,10 +76,12 @@ Before **each** strict connection, the component runs offline `ldap capabilities
 without credentials. It requires JSON `{"schema":1,"features":[...]}` containing
 `channel-binding-require` and, for explicit mode, `explicit-credentials-sasl`.
 Unknown commands, malformed responses, missing platform features and probe
-failures stop the operation before password transmission. The current pinned
-v0.1.0 CLI has no such capability: strict operations return `unsupported`.
-Updating this component alone therefore does not enable hardened-AD login.
-A real upstream release and native/AD acceptance are still required.
+failures stop the operation before password transmission. The bundled
+[CLI v0.2.0](https://github.com/miyako/ldap-cli/releases/tag/v0.2.0) provides
+these capabilities and acquires isolated credentials for the supplied user
+without requiring preexisting tickets. Simple bind, explicit-user SASL and SSO
+remain distinct choices. Actual Windows directory authentication and real AD
+Always-policy acceptance on both platforms remain unverified.
 
 ## Templates: injection-safe filters and DNs
 

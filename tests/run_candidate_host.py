@@ -92,15 +92,7 @@ def main():
                              encoding="utf-8")
             contract_path = host / "contract.json"
             contract = json.loads(contract_path.read_text(encoding="utf-8"))
-            # The candidate passes capability checks, then reaches the unreachable
-            # transport probe. Only the copied fixture's legacy expectations change.
-            updates = {"/legacyCapabilityGate/error/code": "connection",
-                       "/legacyCapabilityGate/exitCode": 3,
-                       "/explicitLoginGate/errors/0/errCode": 81,
-                       "/saslPasswordLogin/errors/0/errCode": 81}
             for assertion in contract["feature"]["assertions"]:
-                if assertion["path"] in updates:
-                    assertion["equals"] = updates[assertion["path"]]
                 if assertion["path"] == "/version/value":
                     assertion["equals"] = version.strip()
             for assertion in contract["execution"]["assertions"]:

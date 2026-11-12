@@ -47,7 +47,7 @@
       },
       {
         "path": "/version/value",
-        "equals": "ldap 0.1.0"
+        "equals": "ldap 0.2.0"
       },
       {
         "path": "/version/stderr",
@@ -207,16 +207,28 @@
         "equals": true
       },
       {
-        "path": "/legacyCapabilityGate/ok",
+        "path": "/bundledCapabilities/ok",
+        "equals": true
+      },
+      {
+        "path": "/bundledCapabilities/stdout",
+        "equals": "{\"features\":[\"explicit-credentials-sasl\",\"channel-binding-require\"],\"schema\":1}\n"
+      },
+      {
+        "path": "/bundledCapabilities/exitCode",
+        "equals": 0
+      },
+      {
+        "path": "/strictConnection/ok",
         "equals": false
       },
       {
-        "path": "/legacyCapabilityGate/error/code",
-        "equals": "unsupported"
+        "path": "/strictConnection/error/code",
+        "equals": "connection"
       },
       {
-        "path": "/legacyCapabilityGate/exitCode",
-        "equals": 2
+        "path": "/strictConnection/exitCode",
+        "equals": 3
       },
       {"path": "/strictCompare/ok", "equals": false},
       {"path": "/strictCompare/value", "absent": true},
@@ -287,11 +299,11 @@
       },
       {
         "path": "/explicitLoginGate/errors/0/errCode",
-        "equals": -1
+        "equals": 81
       },
       {
         "path": "/saslPasswordLogin/errors/0/errCode",
-        "equals": -1
+        "equals": 81
       },
       {
         "path": "/strictMissingPassword/errors/0/errCode",
@@ -326,7 +338,7 @@
         "path": "/renamedExecutable",
         "equals": {
           "ok": true,
-          "stdout": "ldap 0.1.0\n",
+          "stdout": "ldap 0.2.0\n",
           "stderr": "",
           "exitCode": 0
         }

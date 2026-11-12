@@ -84,13 +84,15 @@ the process-local session. Each later operation starts a new CLI and repeats
 authentication using that instance's credentials. `LDAP_SET_OPTIONS` copies
 its input; neither options nor sessions are shared between 4D processes.
 
-**Not yet usable with the bundled dependency:** `cli/release.json` still pins
-the real upstream v0.1.0 assets. They do not support explicit password GSSAPI
-on macOS or the strict CBT contract. The component probes offline capabilities
-before sending credentials and fails with local error -1 against that binary.
-Do not remove the gate, substitute an unverified binary or invent a release pin.
-A published supporting upstream release must be pinned with its actual asset
-hashes, then the final package rebuilt and tested.
+`cli/release.json` pins the genuine
+[upstream v0.2.0 release](https://github.com/miyako/ldap-cli/releases/tag/v0.2.0),
+including its macOS universal and Windows x64 archive hashes. It supplies
+explicit-password GSSAPI with required CBT without preexisting tickets.
+The component probes offline capabilities before sending credentials; unknown
+commands, malformed responses, missing required features or failed probes still
+stop the operation. Unsupported dependencies raise local error -1, transport/TLS
+failures raise 81, and authentication failures raise 49 with native diagnostics.
+Do not interpret every authentication failure as a CBT diagnosis.
 
 Simple TLS binds are not evidence of SASL CBT compliance. Real AD acceptance
 with channel binding **Always** enforced remains **not_run** on macOS and
@@ -111,7 +113,9 @@ The CLI fixture exports synthetic Alice/Bob credentials, expected server
 identities, CA and endpoint through `LDAP_TEST_*`; its KDC/slapd services exist
 only while the hook runs. `TOOL4D` may select the pinned local compiler.
 
-The hook copies the component into test-owned staging, installs only the
+The hook can test a source-built candidate or a hash-verified published executable;
+it records the supplied source revision and actual CLI version. It copies the
+component into test-owned staging, installs only the
 hash-verified native candidate at that copy's normal resource path, and keeps
 capability and authentication checks active. It runs the real source host,
 compiles fresh, then uses the existing 4DZ layout/ZIP writer for a source-stripped,

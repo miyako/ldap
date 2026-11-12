@@ -7,14 +7,15 @@ It runs [miyako/ldap-cli](https://github.com/miyako/ldap-cli), a signed native
 executable bundled in `Resources/bin`, as a separate process.
 
 ```4d
-// Kerberos single sign-on: no password stored or typed
-$ldap:=cs.ldap.LDAP.new({domain: "corp.example"; mech: "gssapi"})
-$result:=$ldap.search(""; "(&(objectClass=user)(sAMAccountName={u}))"; {scope: "sub"; args: {u: $input}; attributes: ["mail"; "memberOf"]})
-
-// Existing code: rename LDAP LOGIN → LDAP_LOGIN, pass arrays as pointers
-LDAP_LOGIN("ldaps://dc1.corp.example"; "CORP\\jdoe"; $password)
+// Supplied application-user password, with required SASL channel binding:
+LDAP_SET_OPTIONS({authMode: "explicit"; mech: "gssapi"; channelBinding: "require"})
+LDAP_LOGIN("ldaps://dc1.corp.example"; "jdoe@CORP.EXAMPLE"; $password)
 LDAP_SEARCH_ALL("DC=corp,DC=example"; ->$_entry; "(objectClass=user)"; LDAP all levels; ->$attrs)
 LDAP_LOGOUT
+
+// Intentional Kerberos SSO is a separate choice, not a password-login replacement:
+$ldap:=cs.ldap.LDAP.new({domain: "corp.example"; authMode: "sso"; mech: "gssapi"})
+$result:=$ldap.search(""; "(&(objectClass=user)(sAMAccountName={u}))"; {scope: "sub"; args: {u: $input}; attributes: ["mail"; "memberOf"]})
 ```
 
 ## Why use it instead of the built-in commands
@@ -23,7 +24,7 @@ LDAP_LOGOUT
 |---|---|---|
 | Operations | Bind and search, read-only | Search, add, modify, delete, rename, compare, password change and reset, Who am I?, any extended operation or control |
 | Encryption | Plaintext on `ldap://` unless you choose `ldaps://` | TLS always: `ldap://` is upgraded with StartTLS; plaintext binds are refused |
-| Authentication | Login and password (DIGEST-MD5 or plain) | Simple bind in TLS, intentional Kerberos/SPNEGO SSO, client certificates (`EXTERNAL`); explicit-user GSSAPI/required-CBT integration is gated on a supporting CLI release (not bundled yet) |
+| Authentication | Login and password (DIGEST-MD5 or plain) | Supplied-user GSSAPI with required CBT, compatibility simple bind in TLS, intentional Kerberos/SPNEGO SSO, client certificates (`EXTERNAL`) |
 | Secrets | Passed to the server by the 4D process | Piped to the child process: never on a command line, in the environment, in a profile or on disk. Empty passwords (unauthenticated binds) are rejected |
 | Server identity | Platform library defaults | Verified against the OS trust store (Keychain, Windows store) with hostname verification, optional revocation checks and minimum TLS version; `probe()` shows the chain and fingerprints |
 | LDAP injection | You concatenate filters by hand | Templates escape every value for its context (RFC 4515 filters, RFC 4514 DNs); filters are syntax-checked before sending |
@@ -68,11 +69,13 @@ Missing credentials fail at login; passwords never force SASL back to simple.
 Simple bind over TLS remains the compatibility default. Intentional SSO selects
 `authMode: "sso"` and empty login/password.
 
-**Dependency integration pending:** the pinned CLI v0.1.0 does not provide the
-required strict capabilities. These calls currently fail closed before sending
-the password, rather than pretending hardened-AD support. A supporting upstream
-release must be pinned and validated. Real AD **Always**-enforced acceptance on
-macOS/Windows remains outstanding; see [authentication modes](docs/migration.md#authentication-modes).
+The bundled [CLI v0.2.0](https://github.com/miyako/ldap-cli/releases/tag/v0.2.0)
+provides explicit-password GSSAPI and required CBT without preexisting tickets.
+Every strict operation still checks offline capabilities before sending a
+password; unsupported or malformed responses fail closed. Use a UPN, verified
+LDAPS or StartTLS, and a trusted server certificate. Real AD
+**Always**-enforced acceptance on macOS/Windows remains outstanding; see
+[authentication modes](docs/migration.md#authentication-modes).
 
 ## How the CLI gets here
 
@@ -87,6 +90,14 @@ signatures intact. To move to a new CLI release, update `cli/release.json`
 (tag, version, digests from the release's `SHA256SUMS.txt`). The CLI keeps its
 own version; releasing the component changes only `template.json` and
 `package.json`.
+
+The current upstream tag is bound to source commit
+`0627e38b4742065d6733b4ad82c35e54a64f6eb2`; its
+[official release run](https://github.com/miyako/ldap-cli/actions/runs/43159013347)
+signed and notarized the macOS universal CLI. The downloaded macOS and Windows
+x64 archives were checked against both the published checksum manifest and
+GitHub asset digests. Native dependency pins and bundled redistribution notices
+are unchanged; GSS uses the macOS system framework.
 
 ## Status
 
@@ -109,9 +120,10 @@ session isolation against a local MIT KDC/OpenLDAP fixture. See the opt-in
 
 Not yet verified: this component on native macOS Intel/Windows, deployed
 directories and AD **Always**-enforced policy, writes, or Dependency Manager
-installation of a supporting CLI release. The normal release-pin host tests
-still use offline commands and an unreachable address. The unsigned development
-candidate is not a release dependency and does not change `cli/release.json`.
+installation. The normal release-pin host tests use offline capabilities/helpers
+and an unreachable address; they do not prove AD policy enforcement. The earlier
+unsigned development candidate is not the release dependency: normal packaging
+now uses only the genuine v0.2.0 assets pinned in `cli/release.json`.
 
 ---
 

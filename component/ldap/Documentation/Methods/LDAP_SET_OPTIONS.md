@@ -25,6 +25,9 @@ empty login/password. With no mode or SASL options, the simple-bind compatibilit
 default is unchanged. Options affect only the next login in this process, not
 an existing session or another process.
 
-The pinned CLI v0.1.0 cannot satisfy explicit/required-CBT mode. The component
-fails closed until a genuine supporting CLI release is integrated; see
+The bundled CLI v0.2.0 supports explicit-password GSSAPI with required CBT.
+Keep verified TLS enabled and use the supplied user's UPN; no preexisting
+Kerberos ticket is needed in explicit mode. Offline capability checks remain
+mandatory and fail closed for unsupported dependencies. Real AD Always-policy
+and Windows directory-authentication acceptance remain outstanding; see
 [authentication modes](../../../../docs/migration.md#authentication-modes).

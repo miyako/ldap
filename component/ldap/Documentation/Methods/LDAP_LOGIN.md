@@ -31,11 +31,13 @@ with a password, also selects explicit mode; incompatible settings fail rather
 than downgrade. Strict login checks an authenticated, unpaged RootDSE search
 before saving the session; it does not depend on the optional Who Am I operation.
 
-**Dependency limitation:** the current pinned CLI v0.1.0 does not implement this
-strict contract. Explicit mode and required-CBT SSO fail locally with error -1
-until an upstream release providing the required offline capabilities is pinned
-and verified. No password is passed to the capability probe. This is not a
-claim of real-AD acceptance; see [Migration](../../../../docs/migration.md#authentication-modes).
+The bundled CLI v0.2.0 implements this strict contract, including explicit
+password GSSAPI without preexisting tickets. Each strict operation still checks
+offline capabilities without a password; unsupported dependencies fail with
+local error -1 before credential transmission. Transport/TLS failures raise 81;
+authentication failures raise 49 with native diagnostics, not an invented CBT
+diagnosis. Real AD Always-policy and Windows directory-authentication acceptance
+remain outstanding; see [Migration](../../../../docs/migration.md#authentication-modes).
 
 Errors are raised with `componentSignature` `"ldap"`. Catch them with
 `ON ERR CALL(…; ek errors from components)`: a local handler does not see
