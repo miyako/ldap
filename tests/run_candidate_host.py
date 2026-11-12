@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Opt-in native development fixture, never a release-pin or runtime override.
+"""Opt-in native-only test fixture, never a release-pin or runtime override.
 
 Run as LDAP_KERBEROS_TEST_HOOK inside ldap-cli's bounded kerberos-macos.sh
 fixture. LDAP_CANDIDATE, LDAP_CANDIDATE_SHA256 and LDAP_CANDIDATE_REVISION bind
-the development binary; LDAP_TEST_* describes only its synthetic local server.
+the tested binary; LDAP_TEST_* describes only its synthetic local server.
 """
 import hashlib
 import json

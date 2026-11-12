@@ -109,13 +109,15 @@ Verified locally on macOS arm64 with tool4d 21.0:
   offline helpers, error classification (`usage`, `connection`), password
   handling, hyphen-leading values, and the drop-ins' errors (codes 1003 and 81,
   delivered to the host's `ek errors from components` handler).
-* The bundled universal binary verifies as notarized Developer ID after
-  packaging.
+* The assembled universal CLI retains a valid Developer ID signature.
+  Notarization was accepted by the upstream CLI release workflow; it does not
+  constitute signing or Gatekeeper acceptance of this component package.
 
-Separate development-candidate verification uses a test-owned native-only copy,
-not the pinned release: real source and source-stripped compiled 4D hosts passed
+The published v0.2.0 executable was also retested in a separate test-owned
+native-only copy: real source and source-stripped compiled 4D hosts passed
 supplied-user login/search/Who Am I, password and TLS failures, and two-worker
-session isolation against a local MIT KDC/OpenLDAP fixture. See the opt-in
+session isolation against a local MIT KDC/OpenLDAP fixture. This supplements
+the earlier unsigned-candidate checks, not AD acceptance. See the opt-in
 [candidate integration hook](docs/migration.md#development-candidate-integration-test-only).
 
 Not yet verified: this component on native macOS Intel/Windows, deployed
